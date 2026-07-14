@@ -820,14 +820,6 @@ function CocktailArt({
         alt={`${cocktail.name} 술 사진`}
       />
       <div className="art-photo-shade" />
-      <div className="art-glow" />
-      <div className="art-glass">
-        <div className="art-liquid" />
-        <div className="art-stem" />
-        <div className="art-foot" />
-      </div>
-      <Wine className="art-symbol" size={36} strokeWidth={1.3} />
-      <span className="art-shine" />
     </motion.div>
   );
 }
