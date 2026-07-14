@@ -1,159 +1,2069 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ChevronRight, Clock3, Cloud, CloudRain, Flower2, Heart, Home, Info, Leaf, LoaderCircle, Martini, Moon, Music2, Pause, Play, Plus, RotateCw, Search, Settings, Sparkles, Sun, Trash2, Volume2, Waves, Wine, X, Zap } from 'lucide-react'
-import { alcohols, cocktails } from './data/cocktails'
-import type { Alcohol, Cocktail, Mood, MoodTheme, Strength } from './types'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Clock3,
+  Cloud,
+  CloudRain,
+  Flower2,
+  Heart,
+  Home,
+  Info,
+  Leaf,
+  LoaderCircle,
+  Martini,
+  Moon,
+  Music2,
+  Pause,
+  Play,
+  Plus,
+  RotateCw,
+  Search,
+  Settings,
+  Sparkles,
+  Sun,
+  Trash2,
+  Volume2,
+  Waves,
+  Wine,
+  X,
+  Zap,
+} from "lucide-react";
+import { alcohols, cocktails } from "./data/cocktails";
+import type { Alcohol, Cocktail, Mood, MoodTheme, Strength } from "./types";
 
-type Screen = 'welcome' | 'preferences' | 'loading' | 'result' | 'favorites' | 'settings' | 'about'
-type AgentSearchState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
-type MusicMood = { title: string; genre: string; videoId: string; description: string }
-type MoodThemeConfig = { id: MoodTheme; name: string; description: string; legacyMood: Mood; preferredAlcohol: Alcohol[]; drinks: string[]; colors: string[]; gradient: string; music: { title: string; genre: string; description: string; url: string; image: string } }
-const spring = { type: 'spring', stiffness: 360, damping: 25 } as const
+type Screen =
+  | "welcome"
+  | "preferences"
+  | "loading"
+  | "result"
+  | "favorites"
+  | "settings"
+  | "about";
+type AgentSearchState = "idle" | "loading" | "success" | "empty" | "error";
+type MusicMood = {
+  title: string;
+  genre: string;
+  videoId: string;
+  description: string;
+};
+type MoodThemeConfig = {
+  id: MoodTheme;
+  name: string;
+  description: string;
+  legacyMood: Mood;
+  preferredAlcohol: Alcohol[];
+  drinks: string[];
+  colors: string[];
+  gradient: string;
+  music: {
+    title: string;
+    genre: string;
+    description: string;
+    url: string;
+    image: string;
+  };
+};
+const spring = { type: "spring", stiffness: 360, damping: 25 } as const;
 
-const moodLabels: Record<Mood, string> = { Happy: '행복해요', Relaxed: '편안해요', Romantic: '로맨틱해요', Party: '신나요', Stressed: '스트레스 받아요', Tired: '지쳤어요' }
-const alcoholLabels: Record<Alcohol, string> = { Vodka: '보드카', Gin: '진', Rum: '럼', Whiskey: '위스키', Tequila: '테킬라', Brandy: '브랜디', Soju: '소주', Beer: '맥주', Wine: '와인' }
-const strengthLabels: Record<Strength, string> = { Light: '가볍게', Medium: '적당히', Strong: '진하게' }
-const moodRituals: Record<MoodTheme, string> = { 'golden-hour':'오늘의 여유를 천천히 따라가세요.', flirt:'설레는 순간을 조금 더 길게 머물게 해요.', 'soft-mood':'아무것도 서두르지 않아도 괜찮은 시간이에요.', 'after-dark':'어두운 바의 깊은 여운을 천천히 즐겨보세요.', bold:'오늘 밤의 중심은 당신입니다.', escape:'잠시 다른 곳에 도착한 듯한 한 잔입니다.', celebration:'좋은 순간은 지금 건배할 때 가장 빛나요.', 'rainy-day':'빗소리 사이로 따뜻한 한 잔을 준비했어요.', 'sweet-crush':'달콤한 설렘을 한 모금씩 천천히 즐겨보세요.', chill:'생각을 잠시 내려놓고 편하게 쉬어가세요.' }
-const cocktailNames = ['시트러스 블룸','벨벳 아워','로즈 애프터글로우','미드나잇 팔로마','클라우드 나인','가든 김렛','선셋 스프리츠','스파이스드 오차드','코스탈 뮬','콰이어트 스톰','허니 피즈','브램블 누아','골든 사워','아가베 하이볼','베리 브랜디 스매시','코코넛 문','루비 네그로니','레몬 샨디','스모크드 메이플','페어 블라썸']
-const cocktailDescriptions = ['기분을 산뜻하게 끌어올리는 밝고 톡 쏘는 한 잔이에요.','은은한 스파이스와 따뜻한 여운이 남는 부드러운 나이트캡이에요.','플로럴한 향과 장미빛 분위기가 조용히 설레게 해요.','스모키한 깊이와 탄산감으로 파티를 시작하기 좋아요.','느린 저녁에 잘 어울리는 포근하고 크리미한 한 잔이에요.','오이와 라임의 산뜻함으로 마음을 차분하게 정리해줘요.','황금빛 노을처럼 가볍고 기분 좋은 스프리츠예요.','따뜻한 사과와 스파이스가 천천히 빛나는 위스키 칵테일이에요.','진저의 알싸함과 라임, 탄산이 시원하게 어우러져요.','어둡고 부드러운 풍미가 깊은 숨을 고르게 해줘요.','은은하게 달콤하고 청량해서 부담 없이 즐기기 좋아요.','베리의 진한 색감과 산미가 우아하면서도 장난스러워요.','상큼한 시트러스와 실키한 위스키의 균형이 좋아요.','깨끗한 아가베와 자몽이 바람처럼 가볍게 지나가요.','상큼한 베리와 민트가 빠르게 기분을 바꿔줘요.','코코넛과 바닐라가 작은 휴가처럼 부드럽게 감싸줘요.','쌉쌀하고 달콤한 루비빛 한 잔으로 마음을 리셋해요.','맑고 상쾌해서 거의 손이 가지 않는 여름날의 한 잔이에요.','촛불 아래 천천히 마시기 좋은 스모키한 위스키예요.','배와 플로럴 노트가 부드럽게 내려앉는 편안한 한 잔이에요.']
+const moodLabels: Record<Mood, string> = {
+  Happy: "행복해요",
+  Relaxed: "편안해요",
+  Romantic: "로맨틱해요",
+  Party: "신나요",
+  Stressed: "스트레스 받아요",
+  Tired: "지쳤어요",
+};
+const alcoholLabels: Record<Alcohol, string> = {
+  Vodka: "보드카",
+  Gin: "진",
+  Rum: "럼",
+  Whiskey: "위스키",
+  Tequila: "테킬라",
+  Brandy: "브랜디",
+  Soju: "소주",
+  Beer: "맥주",
+  Wine: "와인",
+};
+const strengthLabels: Record<Strength, string> = {
+  Light: "가볍게",
+  Medium: "적당히",
+  Strong: "진하게",
+};
+const moodRituals: Record<MoodTheme, string> = {
+  "golden-hour": "오늘의 여유를 천천히 따라가세요.",
+  flirt: "설레는 순간을 조금 더 길게 머물게 해요.",
+  "soft-mood": "아무것도 서두르지 않아도 괜찮은 시간이에요.",
+  "after-dark": "어두운 바의 깊은 여운을 천천히 즐겨보세요.",
+  bold: "오늘 밤의 중심은 당신입니다.",
+  escape: "잠시 다른 곳에 도착한 듯한 한 잔입니다.",
+  celebration: "좋은 순간은 지금 건배할 때 가장 빛나요.",
+  "rainy-day": "빗소리 사이로 따뜻한 한 잔을 준비했어요.",
+  "sweet-crush": "달콤한 설렘을 한 모금씩 천천히 즐겨보세요.",
+  chill: "생각을 잠시 내려놓고 편하게 쉬어가세요.",
+};
+const cocktailNames = [
+  "시트러스 블룸",
+  "벨벳 아워",
+  "로즈 애프터글로우",
+  "미드나잇 팔로마",
+  "클라우드 나인",
+  "가든 김렛",
+  "선셋 스프리츠",
+  "스파이스드 오차드",
+  "코스탈 뮬",
+  "콰이어트 스톰",
+  "허니 피즈",
+  "브램블 누아",
+  "골든 사워",
+  "아가베 하이볼",
+  "베리 브랜디 스매시",
+  "코코넛 문",
+  "루비 네그로니",
+  "레몬 샨디",
+  "스모크드 메이플",
+  "페어 블라썸",
+];
+const cocktailDescriptions = [
+  "기분을 산뜻하게 끌어올리는 밝고 톡 쏘는 한 잔이에요.",
+  "은은한 스파이스와 따뜻한 여운이 남는 부드러운 나이트캡이에요.",
+  "플로럴한 향과 장미빛 분위기가 조용히 설레게 해요.",
+  "스모키한 깊이와 탄산감으로 파티를 시작하기 좋아요.",
+  "느린 저녁에 잘 어울리는 포근하고 크리미한 한 잔이에요.",
+  "오이와 라임의 산뜻함으로 마음을 차분하게 정리해줘요.",
+  "황금빛 노을처럼 가볍고 기분 좋은 스프리츠예요.",
+  "따뜻한 사과와 스파이스가 천천히 빛나는 위스키 칵테일이에요.",
+  "진저의 알싸함과 라임, 탄산이 시원하게 어우러져요.",
+  "어둡고 부드러운 풍미가 깊은 숨을 고르게 해줘요.",
+  "은은하게 달콤하고 청량해서 부담 없이 즐기기 좋아요.",
+  "베리의 진한 색감과 산미가 우아하면서도 장난스러워요.",
+  "상큼한 시트러스와 실키한 위스키의 균형이 좋아요.",
+  "깨끗한 아가베와 자몽이 바람처럼 가볍게 지나가요.",
+  "상큼한 베리와 민트가 빠르게 기분을 바꿔줘요.",
+  "코코넛과 바닐라가 작은 휴가처럼 부드럽게 감싸줘요.",
+  "쌉쌀하고 달콤한 루비빛 한 잔으로 마음을 리셋해요.",
+  "맑고 상쾌해서 거의 손이 가지 않는 여름날의 한 잔이에요.",
+  "촛불 아래 천천히 마시기 좋은 스모키한 위스키예요.",
+  "배와 플로럴 노트가 부드럽게 내려앉는 편안한 한 잔이에요.",
+];
 const musicByMood: Record<Mood, MusicMood> = {
-  Happy: { title: '햇살 가득한 펑크 & 팝', genre: 'Funk / Pop', videoId: 'ZbZSe6N_BXs', description: '기분을 한 단계 더 밝게 만드는 리듬' },
-  Relaxed: { title: '재즈 라운지', genre: 'Jazz Lounge', videoId: 'Dx5qFachd3A', description: '잔잔한 밤에 어울리는 느긋한 그루브' },
-  Romantic: { title: '로맨틱 피아노 재즈', genre: 'Piano Jazz', videoId: 'E1bFoaG7p6I', description: '대화 사이를 부드럽게 채우는 선율' },
-  Party: { title: '오늘 밤의 EDM', genre: 'EDM', videoId: 'kJQP7kiw5Fk', description: '잔을 부딪치고 싶어지는 에너지' },
-  Stressed: { title: '비 내리는 재즈', genre: 'Rain Sounds + Jazz', videoId: 'q76bMs-NwRk', description: '복잡한 생각을 낮춰주는 빗소리와 재즈' },
-  Tired: { title: '느린 밤의 로파이', genre: 'Lo-fi', videoId: 'jfKfPfyJRdk', description: '하루를 천천히 마무리하는 따뜻한 비트' },
-}
+  Happy: {
+    title: "햇살 가득한 펑크 & 팝",
+    genre: "Funk / Pop",
+    videoId: "ZbZSe6N_BXs",
+    description: "기분을 한 단계 더 밝게 만드는 리듬",
+  },
+  Relaxed: {
+    title: "재즈 라운지",
+    genre: "Jazz Lounge",
+    videoId: "Dx5qFachd3A",
+    description: "잔잔한 밤에 어울리는 느긋한 그루브",
+  },
+  Romantic: {
+    title: "로맨틱 피아노 재즈",
+    genre: "Piano Jazz",
+    videoId: "E1bFoaG7p6I",
+    description: "대화 사이를 부드럽게 채우는 선율",
+  },
+  Party: {
+    title: "오늘 밤의 EDM",
+    genre: "EDM",
+    videoId: "kJQP7kiw5Fk",
+    description: "잔을 부딪치고 싶어지는 에너지",
+  },
+  Stressed: {
+    title: "비 내리는 재즈",
+    genre: "Rain Sounds + Jazz",
+    videoId: "q76bMs-NwRk",
+    description: "복잡한 생각을 낮춰주는 빗소리와 재즈",
+  },
+  Tired: {
+    title: "느린 밤의 로파이",
+    genre: "Lo-fi",
+    videoId: "jfKfPfyJRdk",
+    description: "하루를 천천히 마무리하는 따뜻한 비트",
+  },
+};
 const moodThemes: MoodThemeConfig[] = [
-  { id:'golden-hour', name:'Golden Hour', description:'따뜻하고 여유로운 저녁', legacyMood:'Happy', preferredAlcohol:['Wine'], drinks:['화이트와인','아페롤 스프리츠'], colors:['Warm Gold','Champagne Beige'], gradient:'linear-gradient(145deg,#b88032,#f2d7a0 55%,#3a2117)', music:{ title:'Golden Hour · Jazz & Acoustic', genre:'재즈 / 어쿠스틱', description:'노을빛처럼 부드러운 저녁의 리듬', url:'https://www.youtube.com/results?search_query=golden+hour+jazz+acoustic+playlist', image:'/wine-pour.jpg' } },
-  { id:'flirt', name:'Flirt', description:'설레고 로맨틱한 순간', legacyMood:'Romantic', preferredAlcohol:['Wine','Brandy'], drinks:['로제와인','벨리니'], colors:['Rose Pink','Soft Peach'], gradient:'linear-gradient(145deg,#6c1f36,#d98d91 55%,#f3c0a9)', music:{ title:'Flirt · Piano Jazz', genre:'피아노 재즈', description:'대화 사이를 은은하게 채우는 선율', url:'https://www.youtube.com/results?search_query=romantic+piano+jazz+playlist', image:'/wine-noise.jpg' } },
-  { id:'soft-mood', name:'Soft Mood', description:'포근하고 편안한 하루', legacyMood:'Relaxed', preferredAlcohol:['Beer','Brandy'], drinks:['밀맥주','크림 리큐르'], colors:['Cream','Warm Beige'], gradient:'linear-gradient(145deg,#6b6755,#e2d5b9 55%,#2a302d)', music:{ title:'Soft Mood · Slow Evening', genre:'어쿠스틱 / 칠', description:'마음의 온도를 낮추는 포근한 사운드', url:'https://www.youtube.com/results?search_query=soft+evening+acoustic+chill+playlist', image:'/wine-noise.jpg' } },
-  { id:'after-dark', name:'After Dark', description:'감성적인 밤', legacyMood:'Relaxed', preferredAlcohol:['Whiskey','Wine'], drinks:['위스키','레드와인'], colors:['Navy','Dark Brown','Gold'], gradient:'linear-gradient(145deg,#080d20,#3a2119 60%,#b27c35)', music:{ title:'After Dark · Hotel Lounge', genre:'R&B / Jazz', description:'호텔 위스키 바의 낮고 깊은 그루브', url:'https://www.youtube.com/results?search_query=after+dark+r%26b+jazz+lounge+playlist', image:'/wine-noise.jpg' } },
-  { id:'bold', name:'Bold', description:'자신감 넘치고 강렬한 기분', legacyMood:'Party', preferredAlcohol:['Whiskey'], drinks:['올드 패션드','버번'], colors:['Black','Dark Amber'], gradient:'linear-gradient(145deg,#050505,#522414 60%,#cf8335)', music:{ title:'Bold · Midnight Energy', genre:'소울 / 얼터너티브', description:'한 잔의 존재감처럼 선명한 에너지', url:'https://www.youtube.com/results?search_query=bold+midnight+soul+playlist', image:'/wine-pour.jpg' } },
-  { id:'escape', name:'Escape', description:'여행을 떠나고 싶은 하루', legacyMood:'Happy', preferredAlcohol:['Rum','Tequila'], drinks:['모히토','블루 하와이'], colors:['Ocean Blue','Mint Green'], gradient:'linear-gradient(145deg,#07364a,#1b8b88 58%,#b8d5a0)', music:{ title:'Escape · The Ocean', genre:'트로피컬', description:'휴양지 바에서 듣는 Mike Perry의 바다', url:'https://www.youtube.com/results?search_query=Mike+Perry+The+Ocean', image:'/wine-pour.jpg' } },
-  { id:'celebration', name:'Celebration', description:'축하하고 싶은 날', legacyMood:'Happy', preferredAlcohol:['Wine','Beer'], drinks:['샴페인','프로세코'], colors:['Gold','Ivory'], gradient:'linear-gradient(145deg,#8d5c20,#f1d28b 55%,#f7f2df)', music:{ title:'Celebration · Golden Pop', genre:'펑크 / 팝', description:'잔을 부딪치고 웃고 싶은 순간의 음악', url:'https://www.youtube.com/results?search_query=celebration+funk+pop+playlist', image:'/wine-pour.jpg' } },
-  { id:'rainy-day', name:'Rainy Day', description:'비 오는 날의 감성', legacyMood:'Tired', preferredAlcohol:['Brandy','Beer'], drinks:['아이리시 커피','흑맥주'], colors:['Warm Gray','Coffee Brown','Fog White'], gradient:'linear-gradient(145deg,#25272a,#5b4436 58%,#b3aaa0)', music:{ title:'Rainy Day · Cafe Window', genre:'잔잔한 R&B', description:'창밖의 빗소리처럼 조용히 흐르는 음악', url:'https://www.youtube.com/results?search_query=rainy+day+cafe+R%26B+playlist', image:'/wine-noise.jpg' } },
-  { id:'sweet-crush', name:'Sweet Crush', description:'달콤하고 귀여운 무드', legacyMood:'Romantic', preferredAlcohol:['Wine','Soju'], drinks:['피치 칵테일','모스카토'], colors:['Peach','Light Pink'], gradient:'linear-gradient(145deg,#7f3440,#f0a18d 55%,#ffd6c6)', music:{ title:'Sweet Crush · Peach Pop', genre:'팝 / 드림팝', description:'달콤한 기분을 위한 말랑한 멜로디', url:'https://www.youtube.com/results?search_query=sweet+peach+dream+pop+playlist', image:'/wine-pour.jpg' } },
-  { id:'chill', name:'Chill', description:'아무 생각 없이 쉬고 싶은 날', legacyMood:'Relaxed', preferredAlcohol:['Vodka','Gin'], drinks:['하이볼','진토닉'], colors:['Olive Green','Warm Beige'], gradient:'linear-gradient(145deg,#293932,#777c55 55%,#d6c6a6)', music:{ title:'Chill · Hotel Bath', genre:'Lo-fi', description:'호텔 욕조에서 쉬는 듯한 느린 비트', url:'https://www.youtube.com/results?search_query=chill+lofi+hotel+evening+playlist', image:'/wine-noise.jpg' } },
-]
-const themeById = (id: MoodTheme) => moodThemes.find(theme => theme.id === id) || moodThemes[0]
+  {
+    id: "golden-hour",
+    name: "Golden Hour",
+    description: "따뜻하고 여유로운 저녁",
+    legacyMood: "Happy",
+    preferredAlcohol: ["Wine"],
+    drinks: ["화이트와인", "아페롤 스프리츠"],
+    colors: ["Warm Gold", "Champagne Beige"],
+    gradient: "linear-gradient(145deg,#b88032,#f2d7a0 55%,#3a2117)",
+    music: {
+      title: "Golden Hour · Jazz & Acoustic",
+      genre: "재즈 / 어쿠스틱",
+      description: "노을빛처럼 부드러운 저녁의 리듬",
+      url: "https://www.youtube.com/results?search_query=golden+hour+jazz+acoustic+playlist",
+      image: "/wine-pour.jpg",
+    },
+  },
+  {
+    id: "flirt",
+    name: "Flirt",
+    description: "설레고 로맨틱한 순간",
+    legacyMood: "Romantic",
+    preferredAlcohol: ["Wine", "Brandy"],
+    drinks: ["로제와인", "벨리니"],
+    colors: ["Rose Pink", "Soft Peach"],
+    gradient: "linear-gradient(145deg,#6c1f36,#d98d91 55%,#f3c0a9)",
+    music: {
+      title: "Flirt · Piano Jazz",
+      genre: "피아노 재즈",
+      description: "대화 사이를 은은하게 채우는 선율",
+      url: "https://www.youtube.com/results?search_query=romantic+piano+jazz+playlist",
+      image: "/wine-noise.jpg",
+    },
+  },
+  {
+    id: "soft-mood",
+    name: "Soft Mood",
+    description: "포근하고 편안한 하루",
+    legacyMood: "Relaxed",
+    preferredAlcohol: ["Beer", "Brandy"],
+    drinks: ["밀맥주", "크림 리큐르"],
+    colors: ["Cream", "Warm Beige"],
+    gradient: "linear-gradient(145deg,#6b6755,#e2d5b9 55%,#2a302d)",
+    music: {
+      title: "Soft Mood · Slow Evening",
+      genre: "어쿠스틱 / 칠",
+      description: "마음의 온도를 낮추는 포근한 사운드",
+      url: "https://www.youtube.com/results?search_query=soft+evening+acoustic+chill+playlist",
+      image: "/wine-noise.jpg",
+    },
+  },
+  {
+    id: "after-dark",
+    name: "After Dark",
+    description: "감성적인 밤",
+    legacyMood: "Relaxed",
+    preferredAlcohol: ["Whiskey", "Wine"],
+    drinks: ["위스키", "레드와인"],
+    colors: ["Navy", "Dark Brown", "Gold"],
+    gradient: "linear-gradient(145deg,#080d20,#3a2119 60%,#b27c35)",
+    music: {
+      title: "After Dark · Hotel Lounge",
+      genre: "R&B / Jazz",
+      description: "호텔 위스키 바의 낮고 깊은 그루브",
+      url: "https://www.youtube.com/results?search_query=after+dark+r%26b+jazz+lounge+playlist",
+      image: "/wine-noise.jpg",
+    },
+  },
+  {
+    id: "bold",
+    name: "Bold",
+    description: "자신감 넘치고 강렬한 기분",
+    legacyMood: "Party",
+    preferredAlcohol: ["Whiskey"],
+    drinks: ["올드 패션드", "버번"],
+    colors: ["Black", "Dark Amber"],
+    gradient: "linear-gradient(145deg,#050505,#522414 60%,#cf8335)",
+    music: {
+      title: "Bold · Midnight Energy",
+      genre: "소울 / 얼터너티브",
+      description: "한 잔의 존재감처럼 선명한 에너지",
+      url: "https://www.youtube.com/results?search_query=bold+midnight+soul+playlist",
+      image: "/wine-pour.jpg",
+    },
+  },
+  {
+    id: "escape",
+    name: "Escape",
+    description: "여행을 떠나고 싶은 하루",
+    legacyMood: "Happy",
+    preferredAlcohol: ["Rum", "Tequila"],
+    drinks: ["모히토", "블루 하와이"],
+    colors: ["Ocean Blue", "Mint Green"],
+    gradient: "linear-gradient(145deg,#07364a,#1b8b88 58%,#b8d5a0)",
+    music: {
+      title: "Escape · The Ocean",
+      genre: "트로피컬",
+      description: "휴양지 바에서 듣는 Mike Perry의 바다",
+      url: "https://www.youtube.com/results?search_query=Mike+Perry+The+Ocean",
+      image: "/wine-pour.jpg",
+    },
+  },
+  {
+    id: "celebration",
+    name: "Celebration",
+    description: "축하하고 싶은 날",
+    legacyMood: "Happy",
+    preferredAlcohol: ["Wine", "Beer"],
+    drinks: ["샴페인", "프로세코"],
+    colors: ["Gold", "Ivory"],
+    gradient: "linear-gradient(145deg,#8d5c20,#f1d28b 55%,#f7f2df)",
+    music: {
+      title: "Celebration · Golden Pop",
+      genre: "펑크 / 팝",
+      description: "잔을 부딪치고 웃고 싶은 순간의 음악",
+      url: "https://www.youtube.com/results?search_query=celebration+funk+pop+playlist",
+      image: "/wine-pour.jpg",
+    },
+  },
+  {
+    id: "rainy-day",
+    name: "Rainy Day",
+    description: "비 오는 날의 감성",
+    legacyMood: "Tired",
+    preferredAlcohol: ["Brandy", "Beer"],
+    drinks: ["아이리시 커피", "흑맥주"],
+    colors: ["Warm Gray", "Coffee Brown", "Fog White"],
+    gradient: "linear-gradient(145deg,#25272a,#5b4436 58%,#b3aaa0)",
+    music: {
+      title: "Rainy Day · Cafe Window",
+      genre: "잔잔한 R&B",
+      description: "창밖의 빗소리처럼 조용히 흐르는 음악",
+      url: "https://www.youtube.com/results?search_query=rainy+day+cafe+R%26B+playlist",
+      image: "/wine-noise.jpg",
+    },
+  },
+  {
+    id: "sweet-crush",
+    name: "Sweet Crush",
+    description: "달콤하고 귀여운 무드",
+    legacyMood: "Romantic",
+    preferredAlcohol: ["Wine", "Soju"],
+    drinks: ["피치 칵테일", "모스카토"],
+    colors: ["Peach", "Light Pink"],
+    gradient: "linear-gradient(145deg,#7f3440,#f0a18d 55%,#ffd6c6)",
+    music: {
+      title: "Sweet Crush · Peach Pop",
+      genre: "팝 / 드림팝",
+      description: "달콤한 기분을 위한 말랑한 멜로디",
+      url: "https://www.youtube.com/results?search_query=sweet+peach+dream+pop+playlist",
+      image: "/wine-pour.jpg",
+    },
+  },
+  {
+    id: "chill",
+    name: "Chill",
+    description: "아무 생각 없이 쉬고 싶은 날",
+    legacyMood: "Relaxed",
+    preferredAlcohol: ["Vodka", "Gin"],
+    drinks: ["하이볼", "진토닉"],
+    colors: ["Olive Green", "Warm Beige"],
+    gradient: "linear-gradient(145deg,#293932,#777c55 55%,#d6c6a6)",
+    music: {
+      title: "Chill · Hotel Bath",
+      genre: "Lo-fi",
+      description: "호텔 욕조에서 쉬는 듯한 느린 비트",
+      url: "https://www.youtube.com/results?search_query=chill+lofi+hotel+evening+playlist",
+      image: "/wine-noise.jpg",
+    },
+  },
+];
+const themeById = (id: MoodTheme) =>
+  moodThemes.find((theme) => theme.id === id) || moodThemes[0];
 
-const moodKeywordMap: Record<MoodTheme, string[]> = {
-  'golden-hour': ['따뜻', '여유', '노을', '저녁', '황금', '골든', '화이트와인', '아페롤'],
-  flirt: ['설레', '로맨틱', '로맨스', '데이트', '사랑', '연인', '썸', '장미', '로제', '벨리니'],
-  'soft-mood': ['포근', '편안', '부드럽', '차분', '위로', '느긋', '밀맥주', '크림'],
-  'after-dark': ['감성', '어두운', '깊은', '밤', '늦은', '위스키', '레드와인', '호텔바'],
-  bold: ['강렬', '자신감', '진한', '세게', '대담', '버번', '올드패션드'],
-  escape: ['여행', '휴양', '바다', '열대', '상큼', '트로피컬', '모히토', '블루하와이'],
-  celebration: ['축하', '기념', '성공', '건배', '샴페인', '프로세코', '파티'],
-  'rainy-day': ['비', '비오는', '카페', '커피', '아이리시', '흑맥주', '쓸쓸', '잔잔'],
-  'sweet-crush': ['달콤', '귀여', '복숭아', '피치', '모스카토', '말랑'],
-  chill: ['쉬고', '휴식', '아무 생각', '하이볼', '진토닉', '가볍', '상쾌', '릴랙스'],
-}
-
-const alcoholKeywords: Record<Alcohol, string[]> = { Vodka:['보드카','vodka'], Gin:['진토닉','진','gin'], Rum:['럼','rum'], Whiskey:['위스키','whiskey','버번','bourbon'], Tequila:['테킬라','tequila'], Brandy:['브랜디','brandy'], Soju:['소주','soju'], Beer:['맥주','beer'], Wine:['와인','wine','샴페인','프로세코'] }
-const strengthKeywords: Record<Strength, string[]> = { Light:['가볍','약하','낮은 도수','라이트','light'], Medium:['보통','적당','미디엄','medium'], Strong:['강하','진한','높은 도수','스트롱','strong'] }
-
-function matchNaturalLanguageMood(input: string) {
-  const text = input.toLowerCase().replace(/\s+/g, '')
-  const scores = moodThemes.map(theme => ({ theme, score: moodKeywordMap[theme.id].reduce((total, keyword) => total + (text.includes(keyword.toLowerCase().replace(/\s+/g, '')) ? 1 : 0), 0) }))
-  const best = scores.sort((a, b) => b.score - a.score)[0]
-  const selectedTheme = best.score ? best.theme : moodThemes[0]
-  const selectedAlcohol = (Object.entries(alcoholKeywords).find(([, keywords]) => keywords.some(keyword => text.includes(keyword.toLowerCase().replace(/\s+/g, ''))))?.[0] || undefined) as Alcohol | undefined
-  const selectedStrength = (Object.entries(strengthKeywords).find(([, keywords]) => keywords.some(keyword => text.includes(keyword.toLowerCase().replace(/\s+/g, ''))))?.[0] || undefined) as Strength | undefined
-  if (typeof document !== 'undefined') window.setTimeout(() => {
-    const moodButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.mood-theme-card')).find(button => button.textContent?.includes(selectedTheme.name))
-    moodButton?.click()
-    if (selectedStrength) {
-      const strengthButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.strength-options button')).find(button => button.textContent?.includes(strengthLabels[selectedStrength]))
-      strengthButton?.click()
-    }
-    if (selectedAlcohol) {
-      const alcoholButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.ingredient-chip')).find(button => button.textContent?.includes(alcoholLabels[selectedAlcohol]))
-      alcoholButton?.click()
-    }
-  }, 0)
-  return { theme: selectedTheme, alcohol: selectedAlcohol, strength: selectedStrength }
-}
-const youtubeByTheme: Record<MoodTheme, { videoId: string; startSeconds: number }> = { 'golden-hour': { videoId:'Dx5qFachd3A', startSeconds:42 }, flirt:{ videoId:'lCOF9LN_Zxs', startSeconds:35 }, 'soft-mood':{ videoId:'jfKfPfyJRdk', startSeconds:58 }, 'after-dark':{ videoId:'Dx5qFachd3A', startSeconds:86 }, bold:{ videoId:'kJQP7kiw5Fk', startSeconds:48 }, escape:{ videoId:'ZbZSe6N_BXs', startSeconds:28 }, celebration:{ videoId:'ZbZSe6N_BXs', startSeconds:52 }, 'rainy-day':{ videoId:'q76bMs-NwRk', startSeconds:64 }, 'sweet-crush':{ videoId:'E1bFoaG7p6I', startSeconds:24 }, chill:{ videoId:'jfKfPfyJRdk', startSeconds:72 } }
-type ThemeMusic = MusicMood & { startSeconds: number; image: string }
+const youtubeByTheme: Record<
+  MoodTheme,
+  { videoId: string; startSeconds: number }
+> = {
+  "golden-hour": { videoId: "Dx5qFachd3A", startSeconds: 42 },
+  flirt: { videoId: "lCOF9LN_Zxs", startSeconds: 35 },
+  "soft-mood": { videoId: "jfKfPfyJRdk", startSeconds: 58 },
+  "after-dark": { videoId: "Dx5qFachd3A", startSeconds: 86 },
+  bold: { videoId: "kJQP7kiw5Fk", startSeconds: 48 },
+  escape: { videoId: "ZbZSe6N_BXs", startSeconds: 28 },
+  celebration: { videoId: "ZbZSe6N_BXs", startSeconds: 52 },
+  "rainy-day": { videoId: "q76bMs-NwRk", startSeconds: 64 },
+  "sweet-crush": { videoId: "E1bFoaG7p6I", startSeconds: 24 },
+  chill: { videoId: "jfKfPfyJRdk", startSeconds: 72 },
+};
+type ThemeMusic = MusicMood & { startSeconds: number; image: string };
 const musicVariants: Record<MoodTheme, ThemeMusic[]> = {
-  'golden-hour': [
-    { title:'Golden Hour · Jazz & Acoustic', genre:'재즈 / 어쿠스틱', videoId:'Dx5qFachd3A', startSeconds:42, description:'노을빛처럼 부드러운 저녁의 리듬', image:'/wine-pour.jpg' },
-    { title:'Golden Hour · Soft Piano', genre:'피아노 / 어쿠스틱', videoId:'lCOF9LN_Zxs', startSeconds:18, description:'잔잔한 빛과 함께 흐르는 피아노', image:'/cocktails/red-wine-pour.jpg' },
+  "golden-hour": [
+    {
+      title: "Golden Hour · Jazz & Acoustic",
+      genre: "재즈 / 어쿠스틱",
+      videoId: "Dx5qFachd3A",
+      startSeconds: 42,
+      description: "노을빛처럼 부드러운 저녁의 리듬",
+      image: "/wine-pour.jpg",
+    },
+    {
+      title: "Golden Hour · Soft Piano",
+      genre: "피아노 / 어쿠스틱",
+      videoId: "lCOF9LN_Zxs",
+      startSeconds: 18,
+      description: "잔잔한 빛과 함께 흐르는 피아노",
+      image: "/cocktails/red-wine-pour.jpg",
+    },
   ],
   flirt: [
-    { title:'Flirt · Piano Jazz', genre:'피아노 재즈', videoId:'lCOF9LN_Zxs', startSeconds:35, description:'대화 사이를 은은하게 채우는 선율', image:'/cocktails/red-wine-pour.jpg' },
-    { title:'Flirt · Velvet Evening', genre:'로맨틱 재즈', videoId:'Dx5qFachd3A', startSeconds:66, description:'설레는 순간을 위한 따뜻한 스윙', image:'/wine-noise.jpg' },
+    {
+      title: "Flirt · Piano Jazz",
+      genre: "피아노 재즈",
+      videoId: "lCOF9LN_Zxs",
+      startSeconds: 35,
+      description: "대화 사이를 은은하게 채우는 선율",
+      image: "/cocktails/red-wine-pour.jpg",
+    },
+    {
+      title: "Flirt · Velvet Evening",
+      genre: "로맨틱 재즈",
+      videoId: "Dx5qFachd3A",
+      startSeconds: 66,
+      description: "설레는 순간을 위한 따뜻한 스윙",
+      image: "/wine-noise.jpg",
+    },
   ],
-  'soft-mood': [
-    { title:'Soft Mood · Slow Evening', genre:'어쿠스틱 / 칠', videoId:'jfKfPfyJRdk', startSeconds:58, description:'마음의 온도를 낮추는 포근한 사운드', image:'/wine-noise.jpg' },
-    { title:'Soft Mood · Quiet Piano', genre:'슬로우 피아노', videoId:'lCOF9LN_Zxs', startSeconds:12, description:'아무 말 없이 쉬어가는 느린 선율', image:'/cocktails/whisky-glass.jpg' },
+  "soft-mood": [
+    {
+      title: "Soft Mood · Slow Evening",
+      genre: "어쿠스틱 / 칠",
+      videoId: "jfKfPfyJRdk",
+      startSeconds: 58,
+      description: "마음의 온도를 낮추는 포근한 사운드",
+      image: "/wine-noise.jpg",
+    },
+    {
+      title: "Soft Mood · Quiet Piano",
+      genre: "슬로우 피아노",
+      videoId: "lCOF9LN_Zxs",
+      startSeconds: 12,
+      description: "아무 말 없이 쉬어가는 느린 선율",
+      image: "/cocktails/whisky-glass.jpg",
+    },
   ],
-  'after-dark': [
-    { title:'After Dark · Hotel Lounge', genre:'R&B / Jazz', videoId:'Dx5qFachd3A', startSeconds:86, description:'호텔 위스키 바의 낮고 깊은 그루브', image:'/cocktails/whisky-glass.jpg' },
-    { title:'After Dark · Midnight Jazz', genre:'재즈 / 소울', videoId:'lCOF9LN_Zxs', startSeconds:92, description:'어두운 바에 어울리는 느린 밤의 음악', image:'/wine-noise.jpg' },
+  "after-dark": [
+    {
+      title: "After Dark · Hotel Lounge",
+      genre: "R&B / Jazz",
+      videoId: "Dx5qFachd3A",
+      startSeconds: 86,
+      description: "호텔 위스키 바의 낮고 깊은 그루브",
+      image: "/cocktails/whisky-glass.jpg",
+    },
+    {
+      title: "After Dark · Midnight Jazz",
+      genre: "재즈 / 소울",
+      videoId: "lCOF9LN_Zxs",
+      startSeconds: 92,
+      description: "어두운 바에 어울리는 느린 밤의 음악",
+      image: "/wine-noise.jpg",
+    },
   ],
   bold: [
-    { title:'Bold · Midnight Energy', genre:'소울 / 얼터너티브', videoId:'kJQP7kiw5Fk', startSeconds:48, description:'한 잔의 존재감처럼 선명한 에너지', image:'/cocktails/whisky-glass.jpg' },
-    { title:'Bold · After Hours', genre:'클럽 / 팝', videoId:'ZbZSe6N_BXs', startSeconds:30, description:'자신감 있게 밤을 시작하는 비트', image:'/cocktails/dark-drink.jpg' },
+    {
+      title: "Bold · Midnight Energy",
+      genre: "소울 / 얼터너티브",
+      videoId: "kJQP7kiw5Fk",
+      startSeconds: 48,
+      description: "한 잔의 존재감처럼 선명한 에너지",
+      image: "/cocktails/whisky-glass.jpg",
+    },
+    {
+      title: "Bold · After Hours",
+      genre: "클럽 / 팝",
+      videoId: "ZbZSe6N_BXs",
+      startSeconds: 30,
+      description: "자신감 있게 밤을 시작하는 비트",
+      image: "/cocktails/dark-drink.jpg",
+    },
   ],
   escape: [
-    { title:'Escape · The Ocean', genre:'트로피컬', videoId:'ZbZSe6N_BXs', startSeconds:28, description:'휴양지 바에서 듣는 바다의 리듬', image:'/wine-pour.jpg' },
-    { title:'Escape · Island Evening', genre:'트로피컬 팝', videoId:'kJQP7kiw5Fk', startSeconds:24, description:'여행지의 저녁처럼 가볍고 청량한 음악', image:'/cocktails/dark-drink.jpg' },
+    {
+      title: "Escape · The Ocean",
+      genre: "트로피컬",
+      videoId: "ZbZSe6N_BXs",
+      startSeconds: 28,
+      description: "휴양지 바에서 듣는 바다의 리듬",
+      image: "/wine-pour.jpg",
+    },
+    {
+      title: "Escape · Island Evening",
+      genre: "트로피컬 팝",
+      videoId: "kJQP7kiw5Fk",
+      startSeconds: 24,
+      description: "여행지의 저녁처럼 가볍고 청량한 음악",
+      image: "/cocktails/dark-drink.jpg",
+    },
   ],
   celebration: [
-    { title:'Celebration · Golden Pop', genre:'펑크 / 팝', videoId:'ZbZSe6N_BXs', startSeconds:52, description:'잔을 부딪치고 웃고 싶은 순간의 음악', image:'/wine-pour.jpg' },
-    { title:'Celebration · Bright Night', genre:'팝 / 디스코', videoId:'kJQP7kiw5Fk', startSeconds:40, description:'축하의 온도를 더 높여주는 리듬', image:'/cocktails/red-wine-pour.jpg' },
+    {
+      title: "Celebration · Golden Pop",
+      genre: "펑크 / 팝",
+      videoId: "ZbZSe6N_BXs",
+      startSeconds: 52,
+      description: "잔을 부딪치고 웃고 싶은 순간의 음악",
+      image: "/wine-pour.jpg",
+    },
+    {
+      title: "Celebration · Bright Night",
+      genre: "팝 / 디스코",
+      videoId: "kJQP7kiw5Fk",
+      startSeconds: 40,
+      description: "축하의 온도를 더 높여주는 리듬",
+      image: "/cocktails/red-wine-pour.jpg",
+    },
   ],
-  'rainy-day': [
-    { title:'Rainy Day · Cafe Window', genre:'잔잔한 R&B', videoId:'q76bMs-NwRk', startSeconds:64, description:'창밖의 빗소리처럼 조용히 흐르는 음악', image:'/wine-noise.jpg' },
-    { title:'Rainy Day · Warm Piano', genre:'피아노 / 앰비언트', videoId:'lCOF9LN_Zxs', startSeconds:70, description:'따뜻한 컵을 두 손으로 감싸는 시간', image:'/cocktails/whisky-glass.jpg' },
+  "rainy-day": [
+    {
+      title: "Rainy Day · Cafe Window",
+      genre: "잔잔한 R&B",
+      videoId: "q76bMs-NwRk",
+      startSeconds: 64,
+      description: "창밖의 빗소리처럼 조용히 흐르는 음악",
+      image: "/wine-noise.jpg",
+    },
+    {
+      title: "Rainy Day · Warm Piano",
+      genre: "피아노 / 앰비언트",
+      videoId: "lCOF9LN_Zxs",
+      startSeconds: 70,
+      description: "따뜻한 컵을 두 손으로 감싸는 시간",
+      image: "/cocktails/whisky-glass.jpg",
+    },
   ],
-  'sweet-crush': [
-    { title:'Sweet Crush · Peach Pop', genre:'팝 / 드림팝', videoId:'E1bFoaG7p6I', startSeconds:24, description:'달콤한 기분을 위한 말랑한 멜로디', image:'/cocktails/red-wine-pour.jpg' },
-    { title:'Sweet Crush · Soft Glow', genre:'로맨틱 팝', videoId:'ZbZSe6N_BXs', startSeconds:18, description:'살짝 설레는 밤을 위한 가벼운 팝', image:'/wine-pour.jpg' },
+  "sweet-crush": [
+    {
+      title: "Sweet Crush · Peach Pop",
+      genre: "팝 / 드림팝",
+      videoId: "E1bFoaG7p6I",
+      startSeconds: 24,
+      description: "달콤한 기분을 위한 말랑한 멜로디",
+      image: "/cocktails/red-wine-pour.jpg",
+    },
+    {
+      title: "Sweet Crush · Soft Glow",
+      genre: "로맨틱 팝",
+      videoId: "ZbZSe6N_BXs",
+      startSeconds: 18,
+      description: "살짝 설레는 밤을 위한 가벼운 팝",
+      image: "/wine-pour.jpg",
+    },
   ],
   chill: [
-    { title:'Chill · Hotel Bath', genre:'Lo-fi', videoId:'jfKfPfyJRdk', startSeconds:72, description:'호텔 욕조에서 쉬는 듯한 느린 비트', image:'/wine-noise.jpg' },
-    { title:'Chill · Late Night Beats', genre:'Lo-fi / Chillhop', videoId:'jfKfPfyJRdk', startSeconds:155, description:'생각을 잠시 내려놓게 하는 편안한 비트', image:'/cocktails/dark-drink.jpg' },
+    {
+      title: "Chill · Hotel Bath",
+      genre: "Lo-fi",
+      videoId: "jfKfPfyJRdk",
+      startSeconds: 72,
+      description: "호텔 욕조에서 쉬는 듯한 느린 비트",
+      image: "/wine-noise.jpg",
+    },
+    {
+      title: "Chill · Late Night Beats",
+      genre: "Lo-fi / Chillhop",
+      videoId: "jfKfPfyJRdk",
+      startSeconds: 155,
+      description: "생각을 잠시 내려놓게 하는 편안한 비트",
+      image: "/cocktails/dark-drink.jpg",
+    },
   ],
+};
+function ThemeIcon({ theme }: { theme: MoodTheme }) {
+  const props = { size: 21, strokeWidth: 1.5 };
+  if (theme === "golden-hour") return <Sun {...props} />;
+  if (theme === "flirt") return <Heart {...props} />;
+  if (theme === "soft-mood") return <Cloud {...props} />;
+  if (theme === "after-dark") return <Moon {...props} />;
+  if (theme === "bold") return <Zap {...props} />;
+  if (theme === "escape") return <Waves {...props} />;
+  if (theme === "celebration") return <Sparkles {...props} />;
+  if (theme === "rainy-day") return <CloudRain {...props} />;
+  if (theme === "sweet-crush") return <Flower2 {...props} />;
+  return <Leaf {...props} />;
 }
-function ThemeIcon({ theme }: { theme: MoodTheme }) { const props = { size: 21, strokeWidth: 1.5 }; if (theme === 'golden-hour') return <Sun {...props}/>; if (theme === 'flirt') return <Heart {...props}/>; if (theme === 'soft-mood') return <Cloud {...props}/>; if (theme === 'after-dark') return <Moon {...props}/>; if (theme === 'bold') return <Zap {...props}/>; if (theme === 'escape') return <Waves {...props}/>; if (theme === 'celebration') return <Sparkles {...props}/>; if (theme === 'rainy-day') return <CloudRain {...props}/>; if (theme === 'sweet-crush') return <Flower2 {...props}/>; return <Leaf {...props}/> }
-const ingredientReplacements: [RegExp, string][] = [[/aged rum/g,'숙성 럼'],[/dark rum/g,'다크 럼'],[/white rum/g,'화이트 럼'],[/vodka/g,'보드카'],[/gin/g,'진'],[/whiskey/g,'위스키'],[/bourbon/g,'버번'],[/rye whiskey/g,'라이 위스키'],[/tequila/g,'테킬라'],[/brandy/g,'브랜디'],[/soju/g,'소주'],[/wheat beer/g,'밀맥주'],[/sparkling wine/g,'스파클링 와인'],[/red vermouth/g,'레드 베르무트'],[/coffee liqueur/g,'커피 리큐어'],[/elderflower liqueur/g,'엘더플라워 리큐어'],[/blackberry liqueur/g,'블랙베리 리큐어'],[/lemon juice/g,'레몬 주스'],[/lime juice/g,'라임 주스'],[/grapefruit juice/g,'자몽 주스'],[/apple cider/g,'애플 사이다'],[/pear nectar/g,'배 넥타'],[/coconut water/g,'코코넛 워터'],[/ginger beer/g,'진저비어'],[/grapefruit soda/g,'자몽 소다'],[/soda water/g,'탄산수'],[/lemonade/g,'레모네이드'],[/maple syrup/g,'메이플 시럽'],[/honey syrup/g,'허니 시럽'],[/cinnamon syrup/g,'시나몬 시럽'],[/demerara syrup/g,'데메라라 시럽'],[/simple syrup/g,'심플 시럽'],[/vanilla syrup/g,'바닐라 시럽'],[/rose water/g,'로즈 워터'],[/bitters/g,'비터스'],[/cucumber slices/g,'오이 슬라이스'],[/orange peel/g,'오렌지 껍질'],[/lemon wheel/g,'레몬 휠'],[/orange slice/g,'오렌지 슬라이스'],[/rose petal/g,'장미 꽃잎'],[/cinnamon/g,'시나몬'],[/mint/g,'민트'],[/smoked rosemary/g,'훈연한 로즈마리'],[/handful of berries/g,'베리 한 줌'],[/berries/g,'베리'],[/egg white \(optional\)/g,'달걀흰자(선택)'],[/pinch of salt/g,'소금 한 꼬집'],[/salt rim/g,'소금 림'],[/splash of soda/g,'탄산수 약간'],[/bottle/g,'병'],[/ oz/g,'온스'],[/ dashes/g,'대시'],[/°/g,'도']]
-const stepReplacements: [RegExp, string][] = [[/^Shake /,'셰이커에 넣고 흔들어요: '],[/^Dry shake /,'얼음 없이 먼저 흔들어요: '],[/^Stir /,'얼음과 함께 저어요: '],[/^Build /,'잔에 바로 담아요: '],[/^Pour /,'잔에 부어요: '],[/^Fill /,'잔을 채워요: '],[/^Strain /,'걸러 담아요: '],[/^Double strain /,'두 번 걸러 담아요: '],[/^Top with /,'마지막에 올려요: '],[/^Float /,'표면에 살짝 띄워요: '],[/^Express /,'향을 내고 올려요: '],[/^Add /,'더해요: '],[/^Rim /,'잔 가장자리를 장식해요: '],[/^Give it a gentle stir /,'부드럽게 한 번 저어요: '],[/^Finish with /,'마지막으로 더해요: '],[/^Garnish with /,'가니시로 장식해요: '],[/^Dust with /,'가볍게 뿌려요: '],[/^Muddle /,'가볍게 으깨요: '],[/^Shake again /,'다시 흔들어요: '],[/^Stir once /,'한 번만 저어요: '],[/^Discard /,'버려요: ']]
-const localizeIngredient = (text: string) => ingredientReplacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), text)
-const localizeStep = (text: string) => stepReplacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), text).replace(/with ice/g,'얼음과 함께').replace(/over ice/g,'얼음 위에').replace(/into a coupe/g,'쿠페 잔에').replace(/into a rocks glass/g,'온더록스 잔에').replace(/into a stemmed glass/g,'스템드 잔에').replace(/into a chilled coupe/g,'차갑게 식힌 쿠페 잔에').replace(/over crushed ice/g,'부순 얼음 위에').replace(/over fresh ice/g,'새 얼음 위에').replace(/one large cube/g,'큰 얼음 하나').replace(/a large cube/g,'큰 얼음 하나').replace(/pebble ice/g,'조약돌 얼음').replace(/and garnish/g,'가니시로 장식').replace(/and discard/g,'버려요').replace(/and stir\./g,'하고 저어요.').replace(/\.$/,'')
-const localizeCocktail = (cocktail: Cocktail) => ({ ...cocktail, name: cocktailNames[cocktail.id - 1] || cocktail.name, description: cocktailDescriptions[cocktail.id - 1] || cocktail.description, ingredients: cocktail.ingredients.map(localizeIngredient), steps: cocktail.steps.map(localizeStep) })
-const readStorage = <T,>(key: string, fallback: T): T => { try { const value = localStorage.getItem(key); return value === null ? fallback : JSON.parse(value) as T } catch { return fallback } }
+const ingredientReplacements: [RegExp, string][] = [
+  [/aged rum/g, "숙성 럼"],
+  [/dark rum/g, "다크 럼"],
+  [/white rum/g, "화이트 럼"],
+  [/vodka/g, "보드카"],
+  [/gin/g, "진"],
+  [/whiskey/g, "위스키"],
+  [/bourbon/g, "버번"],
+  [/rye whiskey/g, "라이 위스키"],
+  [/tequila/g, "테킬라"],
+  [/brandy/g, "브랜디"],
+  [/soju/g, "소주"],
+  [/wheat beer/g, "밀맥주"],
+  [/sparkling wine/g, "스파클링 와인"],
+  [/red vermouth/g, "레드 베르무트"],
+  [/coffee liqueur/g, "커피 리큐어"],
+  [/elderflower liqueur/g, "엘더플라워 리큐어"],
+  [/blackberry liqueur/g, "블랙베리 리큐어"],
+  [/lemon juice/g, "레몬 주스"],
+  [/lime juice/g, "라임 주스"],
+  [/grapefruit juice/g, "자몽 주스"],
+  [/apple cider/g, "애플 사이다"],
+  [/pear nectar/g, "배 넥타"],
+  [/coconut water/g, "코코넛 워터"],
+  [/ginger beer/g, "진저비어"],
+  [/grapefruit soda/g, "자몽 소다"],
+  [/soda water/g, "탄산수"],
+  [/lemonade/g, "레모네이드"],
+  [/maple syrup/g, "메이플 시럽"],
+  [/honey syrup/g, "허니 시럽"],
+  [/cinnamon syrup/g, "시나몬 시럽"],
+  [/demerara syrup/g, "데메라라 시럽"],
+  [/simple syrup/g, "심플 시럽"],
+  [/vanilla syrup/g, "바닐라 시럽"],
+  [/rose water/g, "로즈 워터"],
+  [/bitters/g, "비터스"],
+  [/cucumber slices/g, "오이 슬라이스"],
+  [/orange peel/g, "오렌지 껍질"],
+  [/lemon wheel/g, "레몬 휠"],
+  [/orange slice/g, "오렌지 슬라이스"],
+  [/rose petal/g, "장미 꽃잎"],
+  [/cinnamon/g, "시나몬"],
+  [/mint/g, "민트"],
+  [/smoked rosemary/g, "훈연한 로즈마리"],
+  [/handful of berries/g, "베리 한 줌"],
+  [/berries/g, "베리"],
+  [/egg white \(optional\)/g, "달걀흰자(선택)"],
+  [/pinch of salt/g, "소금 한 꼬집"],
+  [/salt rim/g, "소금 림"],
+  [/splash of soda/g, "탄산수 약간"],
+  [/bottle/g, "병"],
+  [/ oz/g, "온스"],
+  [/ dashes/g, "대시"],
+  [/°/g, "도"],
+];
+const stepReplacements: [RegExp, string][] = [
+  [/^Shake /, "셰이커에 넣고 흔들어요: "],
+  [/^Dry shake /, "얼음 없이 먼저 흔들어요: "],
+  [/^Stir /, "얼음과 함께 저어요: "],
+  [/^Build /, "잔에 바로 담아요: "],
+  [/^Pour /, "잔에 부어요: "],
+  [/^Fill /, "잔을 채워요: "],
+  [/^Strain /, "걸러 담아요: "],
+  [/^Double strain /, "두 번 걸러 담아요: "],
+  [/^Top with /, "마지막에 올려요: "],
+  [/^Float /, "표면에 살짝 띄워요: "],
+  [/^Express /, "향을 내고 올려요: "],
+  [/^Add /, "더해요: "],
+  [/^Rim /, "잔 가장자리를 장식해요: "],
+  [/^Give it a gentle stir /, "부드럽게 한 번 저어요: "],
+  [/^Finish with /, "마지막으로 더해요: "],
+  [/^Garnish with /, "가니시로 장식해요: "],
+  [/^Dust with /, "가볍게 뿌려요: "],
+  [/^Muddle /, "가볍게 으깨요: "],
+  [/^Shake again /, "다시 흔들어요: "],
+  [/^Stir once /, "한 번만 저어요: "],
+  [/^Discard /, "버려요: "],
+];
+const localizeIngredient = (text: string) =>
+  ingredientReplacements.reduce(
+    (value, [pattern, replacement]) => value.replace(pattern, replacement),
+    text,
+  );
+const localizeStep = (text: string) =>
+  stepReplacements
+    .reduce(
+      (value, [pattern, replacement]) => value.replace(pattern, replacement),
+      text,
+    )
+    .replace(/with ice/g, "얼음과 함께")
+    .replace(/over ice/g, "얼음 위에")
+    .replace(/into a coupe/g, "쿠페 잔에")
+    .replace(/into a rocks glass/g, "온더록스 잔에")
+    .replace(/into a stemmed glass/g, "스템드 잔에")
+    .replace(/into a chilled coupe/g, "차갑게 식힌 쿠페 잔에")
+    .replace(/over crushed ice/g, "부순 얼음 위에")
+    .replace(/over fresh ice/g, "새 얼음 위에")
+    .replace(/one large cube/g, "큰 얼음 하나")
+    .replace(/a large cube/g, "큰 얼음 하나")
+    .replace(/pebble ice/g, "조약돌 얼음")
+    .replace(/and garnish/g, "가니시로 장식")
+    .replace(/and discard/g, "버려요")
+    .replace(/and stir\./g, "하고 저어요.")
+    .replace(/\.$/, "");
+const localizeCocktail = (cocktail: Cocktail) => ({
+  ...cocktail,
+  name: cocktailNames[cocktail.id - 1] || cocktail.name,
+  description: cocktailDescriptions[cocktail.id - 1] || cocktail.description,
+  ingredients: cocktail.ingredients.map(localizeIngredient),
+  steps: cocktail.steps.map(localizeStep),
+});
+const readStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : (JSON.parse(value) as T);
+  } catch {
+    return fallback;
+  }
+};
+type AgentApiResponse = {
+  ok: boolean;
+  fallback?: boolean;
+  answer?: string;
+  message?: string;
+  cocktails?: Array<{ id: number }>;
+  selection?: {
+    mood?: Mood;
+    moodTheme?: MoodTheme;
+    availableAlcohols?: Alcohol[];
+    strength?: Strength;
+  };
+};
+async function requestAgent(message: string): Promise<AgentApiResponse> {
+  const response = await fetch("/api/agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  let data: AgentApiResponse = { ok: false };
+  try {
+    data = (await response.json()) as AgentApiResponse;
+  } catch {
+    throw new Error("서버 응답을 읽을 수 없어요.");
+  }
+  if (!response.ok)
+    throw new Error(data.message || "AI 검색을 사용할 수 없어요.");
+  return data;
+}
 
-function Logo({ compact = false }: { compact?: boolean }) { return <div className="logo"><span className="logo-mark"><Martini size={compact ? 16 : 20} strokeWidth={1.8} /></span>{!compact && <span>바텐더</span>}</div> }
-function Button({ children, onClick, variant = 'primary', icon, className = '' }: { children: React.ReactNode; onClick?: () => void; variant?: 'primary'|'ghost'|'quiet'; icon?: React.ReactNode; className?: string }) { return <motion.button whileTap={{ scale: .97 }} whileHover={{ y: variant === 'primary' ? -2 : 0 }} transition={spring} type="button" onClick={onClick} className={`btn btn-${variant} ${className}`}>{children}{icon}</motion.button> }
-const cocktailImage = (cocktail: Cocktail) => cocktail.alcohol === 'Wine' || cocktail.mood === 'Romantic' ? (cocktail.id % 2 ? '/cocktails/red-wine-pour.jpg' : '/wine-pour.jpg') : cocktail.alcohol === 'Whiskey' || cocktail.alcohol === 'Brandy' || cocktail.mood === 'Stressed' ? (cocktail.id % 2 ? '/cocktails/whisky-glass.jpg' : '/cocktails/dark-drink.jpg') : (cocktail.id % 2 ? '/cocktails/dark-drink.jpg' : '/wine-pour.jpg')
+function clickPreferenceSelection(
+  theme: MoodTheme,
+  strength: Strength | undefined,
+  availableAlcohols: Alcohol[] = [],
+) {
+  window.setTimeout(() => {
+    const moodButton = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".mood-theme-card"),
+    ).find((button) => button.dataset.moodTheme === theme);
+    moodButton?.click();
+    if (strength) {
+      const strengthButton = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          ".strength-options button",
+        ),
+      ).find((button) => button.dataset.strength === strength);
+      strengthButton?.click();
+    }
+    availableAlcohols.forEach((alcohol) => {
+      const alcoholButton = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(".ingredient-chip"),
+      ).find((button) => button.dataset.alcohol === alcohol);
+      alcoholButton?.click();
+    });
+  }, 0);
+}
 
-function CocktailArt({ cocktail, large = false }: { cocktail: Cocktail; large?: boolean }) { return <motion.div initial={large ? { scale: .88, opacity: .7 } : false} animate={large ? { scale: 1, opacity: 1 } : undefined} transition={{ duration: .8, ease: 'easeOut' }} className={`cocktail-art ${large ? 'art-large' : ''}`} style={{ background: cocktail.colors }}><img className="cocktail-photo" src={cocktailImage(cocktail)} alt={`${cocktail.name} 술 사진`} /><div className="art-photo-shade" /><div className="art-glow" /><div className="art-glass"><div className="art-liquid" /><div className="art-stem" /><div className="art-foot" /></div><Wine className="art-symbol" size={36} strokeWidth={1.3}/><span className="art-shine" /></motion.div> }
-function Nav({ screen, navigate }: { screen: Screen; navigate: (s: Screen) => void }) { return <nav className="bottom-nav"><button className={screen !== 'favorites' && screen !== 'settings' && screen !== 'about' ? 'active' : ''} onClick={() => navigate('welcome')}><Home size={18}/><span>홈</span></button><button className={screen === 'favorites' ? 'active' : ''} onClick={() => navigate('favorites')}><Heart size={18}/><span>즐겨찾기</span></button><button className={screen === 'settings' || screen === 'about' ? 'active' : ''} onClick={() => navigate('settings')}><Settings size={18}/><span>설정</span></button></nav> }
-function Header({ back, onBack }: { back?: boolean; onBack?: () => void }) { return <header className="topbar">{back ? <button className="icon-btn" onClick={onBack} aria-label="뒤로 가기"><ArrowLeft size={20}/></button> : <Logo />}<div className="top-actions"><button className="icon-btn" aria-label="소리 설정"><Volume2 size={18}/></button><button className="avatar" aria-label="프로필">A</button></div></header> }
+function Logo({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="logo">
+      <span className="logo-mark">
+        <Martini size={compact ? 16 : 20} strokeWidth={1.8} />
+      </span>
+      {!compact && <span>바텐더</span>}
+    </div>
+  );
+}
+function Button({
+  children,
+  onClick,
+  variant = "primary",
+  icon,
+  className = "",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: "primary" | "ghost" | "quiet";
+  icon?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      whileHover={{ y: variant === "primary" ? -2 : 0 }}
+      transition={spring}
+      type="button"
+      onClick={onClick}
+      className={`btn btn-${variant} ${className}`}
+    >
+      {children}
+      {icon}
+    </motion.button>
+  );
+}
+const cocktailImage = (cocktail: Cocktail) =>
+  cocktail.alcohol === "Wine" || cocktail.mood === "Romantic"
+    ? cocktail.id % 2
+      ? "/cocktails/red-wine-pour.jpg"
+      : "/wine-pour.jpg"
+    : cocktail.alcohol === "Whiskey" ||
+        cocktail.alcohol === "Brandy" ||
+        cocktail.mood === "Stressed"
+      ? cocktail.id % 2
+        ? "/cocktails/whisky-glass.jpg"
+        : "/cocktails/dark-drink.jpg"
+      : cocktail.id % 2
+        ? "/cocktails/dark-drink.jpg"
+        : "/wine-pour.jpg";
 
-function WineHero() { return <svg className="wine-hero" viewBox="0 0 420 330" role="img" aria-label="노이즈 질감의 붉은 와인 글라스"><defs><linearGradient id="wineRed" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor="#ff4038"/><stop offset=".48" stopColor="#b10f1d"/><stop offset="1" stopColor="#3d050f"/></linearGradient><filter id="wineNoise"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="4" seed="14" result="noise"/><feColorMatrix in="noise" type="saturate" values="0" result="grain"/><feComponentTransfer in="grain" result="softGrain"><feFuncA type="table" tableValues="0 .28"/></feComponentTransfer><feBlend in="SourceGraphic" in2="softGrain" mode="screen"/></filter><filter id="wineShadow"><feGaussianBlur stdDeviation="13"/></filter></defs><ellipse cx="235" cy="306" rx="130" ry="15" fill="#ff1e2d" opacity=".22" filter="url(#wineShadow)"/><g transform="translate(48 5) rotate(-7 180 155)"><path d="M93 35h191c-5 84-24 121-75 137v91h45v12H125v-12h45v-91C119 155 98 118 93 35Z" fill="none" stroke="#e72a34" strokeWidth="2" opacity=".72"/><path d="M98 81h181c-7 50-24 76-71 91-39-12-71-36-110-91Z" fill="url(#wineRed)" filter="url(#wineNoise)" opacity=".9"/><path d="M102 76c35 13 118 18 174 1" fill="none" stroke="#ff6a54" strokeWidth="4" opacity=".55"/><path d="M164 171c20 8 38 8 57 0" fill="none" stroke="#f74a45" strokeWidth="3" opacity=".7"/><path d="M123 44c20-7 42-7 61 0" fill="none" stroke="#ff6b5e" strokeWidth="2" opacity=".55"/><path d="M145 205h87" stroke="#ff3941" strokeWidth="1" opacity=".4"/><circle cx="125" cy="112" r="3" fill="#ffb096" opacity=".8"/><circle cx="257" cy="133" r="2" fill="#ff8b79" opacity=".7"/></g></svg> }
-function HeroAtmosphere() { return <div className="hero-atmosphere" aria-hidden="true"><video className="hero-video" autoPlay muted loop playsInline preload="auto"><source src="/wine-pour.mp4" type="video/mp4"/></video><div className="atmosphere-frame atmosphere-pour"/><div className="atmosphere-frame atmosphere-noise"/><div className="atmosphere-tint"/><div className="atmosphere-grain"/></div> }
-function Welcome({ start }: { start: () => void }) { return <div className="screen welcome-screen"><HeroAtmosphere/><Header/><main className="welcome-content"><div className="eyebrow"><span className="eyebrow-line"/> TODAY'S PRIVATE BAR <span className="eyebrow-line"/></div><h1>오늘의 기분으로<br/><em>완벽한 한 잔.</em></h1><p className="lead">오늘의 기분과 집에 있는 술을 알려주세요.<br/>바텐더가 칵테일과 음악을 함께 골라드려요.</p><div className="experience-flow"><div><span>01</span><b>오늘의 기분</b></div><i>↓</i><div><span>02</span><b>집에 있는 술</b></div><i>↓</i><div className="flow-highlight"><Sparkles size={14}/><span>03</span><b>오늘의 추천</b></div><i>↓</i><div><span>04</span><b>레시피 & 음악</b></div></div><div className="hero-art"><WineHero/><div className="hero-orbit orbit-one"/><div className="hero-orbit orbit-two"/><div className="hero-cocktail"><div className="hero-liquid"/><Sparkles className="hero-garnish" size={34} strokeWidth={1.2}/><div className="hero-stem"/><div className="hero-foot"/></div><div className="hero-badge"><Sparkles size={14}/><span>오늘을 위한<br/><b>나만의 바</b></span></div><Sparkles className="hero-stars" size={24}/><Sparkles className="hero-stars star-two" size={20}/></div><Button onClick={start} icon={<ChevronRight size={18}/>} className="start-btn">시작하기</Button><p className="microcopy">오늘 하루를 마무리하는 가장 좋은 방법</p></main></div> }
+function CocktailArt({
+  cocktail,
+  large = false,
+}: {
+  cocktail: Cocktail;
+  large?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={large ? { scale: 0.88, opacity: 0.7 } : false}
+      animate={large ? { scale: 1, opacity: 1 } : undefined}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+      className={`cocktail-art ${large ? "art-large" : ""}`}
+      style={{ background: cocktail.colors }}
+    >
+      <img
+        className="cocktail-photo"
+        src={cocktailImage(cocktail)}
+        alt={`${cocktail.name} 술 사진`}
+      />
+      <div className="art-photo-shade" />
+      <div className="art-glow" />
+      <div className="art-glass">
+        <div className="art-liquid" />
+        <div className="art-stem" />
+        <div className="art-foot" />
+      </div>
+      <Wine className="art-symbol" size={36} strokeWidth={1.3} />
+      <span className="art-shine" />
+    </motion.div>
+  );
+}
+function Nav({
+  screen,
+  navigate,
+}: {
+  screen: Screen;
+  navigate: (s: Screen) => void;
+}) {
+  return (
+    <nav className="bottom-nav">
+      <button
+        className={
+          screen !== "favorites" && screen !== "settings" && screen !== "about"
+            ? "active"
+            : ""
+        }
+        onClick={() => navigate("welcome")}
+      >
+        <Home size={18} />
+        <span>홈</span>
+      </button>
+      <button
+        className={screen === "favorites" ? "active" : ""}
+        onClick={() => navigate("favorites")}
+      >
+        <Heart size={18} />
+        <span>즐겨찾기</span>
+      </button>
+      <button
+        className={screen === "settings" || screen === "about" ? "active" : ""}
+        onClick={() => navigate("settings")}
+      >
+        <Settings size={18} />
+        <span>설정</span>
+      </button>
+    </nav>
+  );
+}
+function Header({ back, onBack }: { back?: boolean; onBack?: () => void }) {
+  return (
+    <header className="topbar">
+      {back ? (
+        <button className="icon-btn" onClick={onBack} aria-label="뒤로 가기">
+          <ArrowLeft size={20} />
+        </button>
+      ) : (
+        <Logo />
+      )}
+      <div className="top-actions">
+        <button className="icon-btn" aria-label="소리 설정">
+          <Volume2 size={18} />
+        </button>
+        <button className="avatar" aria-label="프로필">
+          A
+        </button>
+      </div>
+    </header>
+  );
+}
 
-function AgentSearchPanel({ onSearch }: { onSearch: (message: string) => Promise<{ status: 'success' | 'empty'; reason?: string }> }) { const [query, setQuery] = useState(''); const [state, setState] = useState<AgentSearchState>('idle'); const [message, setMessage] = useState(''); const submit = async () => { const value = query.trim(); if (!value || state === 'loading') return; setState('loading'); setMessage(''); try { const outcome = await onSearch(value); setState(outcome.status); setMessage(outcome.reason || (outcome.status === 'empty' ? '조건에 맞는 무드를 찾지 못했어요.' : '오늘의 무드를 선택했어요.')); } catch (error) { setState('error'); setMessage(error instanceof Error ? error.message : '무드 선택을 완료할 수 없어요.'); } }; return <section className={`agent-search-panel agent-search-${state}`} aria-labelledby="agent-search-title"><div className="agent-search-heading"><div><span className="eyebrow left">MOOD BAR SEARCH</span><h3 id="agent-search-title">원하는 분위기를 말해주세요</h3></div><Search size={20}/></div><div className="agent-search-form"><input value={query} onChange={event => { setQuery(event.target.value); if (state !== 'idle') { setState('idle'); setMessage('') } }} onKeyDown={event => { if (event.key === 'Enter') void submit() }} placeholder="예: 상큼하고 가벼운 저녁을 보내고 싶어" aria-label="원하는 무드 입력" /><button type="button" onClick={() => void submit()} disabled={!query.trim() || state === 'loading'}>{state === 'loading' ? <><LoaderCircle size={17} className="spin"/> 무드 선택 중</> : <><Search size={17}/> 무드 선택</>}</button></div>{message && <p className="agent-search-message" role="status" aria-live="polite">{message}</p>}</section> }
+function WineHero() {
+  return (
+    <svg
+      className="wine-hero"
+      viewBox="0 0 420 330"
+      role="img"
+      aria-label="노이즈 질감의 붉은 와인 글라스"
+    >
+      <defs>
+        <linearGradient id="wineRed" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stopColor="#ff4038" />
+          <stop offset=".48" stopColor="#b10f1d" />
+          <stop offset="1" stopColor="#3d050f" />
+        </linearGradient>
+        <filter id="wineNoise">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency=".9"
+            numOctaves="4"
+            seed="14"
+            result="noise"
+          />
+          <feColorMatrix in="noise" type="saturate" values="0" result="grain" />
+          <feComponentTransfer in="grain" result="softGrain">
+            <feFuncA type="table" tableValues="0 .28" />
+          </feComponentTransfer>
+          <feBlend in="SourceGraphic" in2="softGrain" mode="screen" />
+        </filter>
+        <filter id="wineShadow">
+          <feGaussianBlur stdDeviation="13" />
+        </filter>
+      </defs>
+      <ellipse
+        cx="235"
+        cy="306"
+        rx="130"
+        ry="15"
+        fill="#ff1e2d"
+        opacity=".22"
+        filter="url(#wineShadow)"
+      />
+      <g transform="translate(48 5) rotate(-7 180 155)">
+        <path
+          d="M93 35h191c-5 84-24 121-75 137v91h45v12H125v-12h45v-91C119 155 98 118 93 35Z"
+          fill="none"
+          stroke="#e72a34"
+          strokeWidth="2"
+          opacity=".72"
+        />
+        <path
+          d="M98 81h181c-7 50-24 76-71 91-39-12-71-36-110-91Z"
+          fill="url(#wineRed)"
+          filter="url(#wineNoise)"
+          opacity=".9"
+        />
+        <path
+          d="M102 76c35 13 118 18 174 1"
+          fill="none"
+          stroke="#ff6a54"
+          strokeWidth="4"
+          opacity=".55"
+        />
+        <path
+          d="M164 171c20 8 38 8 57 0"
+          fill="none"
+          stroke="#f74a45"
+          strokeWidth="3"
+          opacity=".7"
+        />
+        <path
+          d="M123 44c20-7 42-7 61 0"
+          fill="none"
+          stroke="#ff6b5e"
+          strokeWidth="2"
+          opacity=".55"
+        />
+        <path d="M145 205h87" stroke="#ff3941" strokeWidth="1" opacity=".4" />
+        <circle cx="125" cy="112" r="3" fill="#ffb096" opacity=".8" />
+        <circle cx="257" cy="133" r="2" fill="#ff8b79" opacity=".7" />
+      </g>
+    </svg>
+  );
+}
+function HeroAtmosphere() {
+  return (
+    <div className="hero-atmosphere" aria-hidden="true">
+      <video
+        className="hero-video"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+      >
+        <source src="/wine-pour.mp4" type="video/mp4" />
+      </video>
+      <div className="atmosphere-frame atmosphere-pour" />
+      <div className="atmosphere-frame atmosphere-noise" />
+      <div className="atmosphere-tint" />
+      <div className="atmosphere-grain" />
+    </div>
+  );
+}
+function Welcome({ start }: { start: () => void }) {
+  return (
+    <div className="screen welcome-screen">
+      <HeroAtmosphere />
+      <Header />
+      <main className="welcome-content">
+        <div className="eyebrow">
+          <span className="eyebrow-line" /> TODAY'S PRIVATE BAR{" "}
+          <span className="eyebrow-line" />
+        </div>
+        <h1>
+          오늘의 기분으로
+          <br />
+          <em>완벽한 한 잔.</em>
+        </h1>
+        <p className="lead">
+          오늘의 기분과 집에 있는 술을 알려주세요.
+          <br />
+          바텐더가 칵테일과 음악을 함께 골라드려요.
+        </p>
+        <div className="experience-flow">
+          <div>
+            <span>01</span>
+            <b>오늘의 기분</b>
+          </div>
+          <i>↓</i>
+          <div>
+            <span>02</span>
+            <b>집에 있는 술</b>
+          </div>
+          <i>↓</i>
+          <div className="flow-highlight">
+            <Sparkles size={14} />
+            <span>03</span>
+            <b>오늘의 추천</b>
+          </div>
+          <i>↓</i>
+          <div>
+            <span>04</span>
+            <b>레시피 & 음악</b>
+          </div>
+        </div>
+        <div className="hero-art">
+          <WineHero />
+          <div className="hero-orbit orbit-one" />
+          <div className="hero-orbit orbit-two" />
+          <div className="hero-cocktail">
+            <div className="hero-liquid" />
+            <Sparkles className="hero-garnish" size={34} strokeWidth={1.2} />
+            <div className="hero-stem" />
+            <div className="hero-foot" />
+          </div>
+          <div className="hero-badge">
+            <Sparkles size={14} />
+            <span>
+              오늘을 위한
+              <br />
+              <b>나만의 바</b>
+            </span>
+          </div>
+          <Sparkles className="hero-stars" size={24} />
+          <Sparkles className="hero-stars star-two" size={20} />
+        </div>
+        <Button
+          onClick={start}
+          icon={<ChevronRight size={18} />}
+          className="start-btn"
+        >
+          시작하기
+        </Button>
+        <p className="microcopy">오늘 하루를 마무리하는 가장 좋은 방법</p>
+      </main>
+    </div>
+  );
+}
 
-function Preferences({ initialTheme, initialAvailable, initialStrength, onFind, onAgentSearch }: { initialTheme: MoodTheme; initialAvailable: Alcohol[]; initialStrength: Strength; onFind: (theme: MoodTheme, a: Alcohol[], s: Strength) => void; onAgentSearch: (message: string) => Promise<{ status: 'success' | 'empty'; reason?: string }> }) { const [theme, setTheme] = useState<MoodTheme>(initialTheme); const [selected, setSelected] = useState<Alcohol[]>(initialAvailable); const [strength, setStrength] = useState<Strength>(initialStrength); const selectedTheme = themeById(theme); const toggleAlcohol = (a: Alcohol) => setSelected(v => v.includes(a) ? v.filter(x => x !== a) : [...v, a]); const sliderValue = strength === 'Light' ? 25 : strength === 'Strong' ? 75 : 50; return <div className="screen"><Header back/><main className="preferences mood-preferences"><div className="section-intro"><span className="step-label">01 <i/> 03</span><h2>오늘,<br/><em>어떤 무드와 함께하고 싶나요?</em></h2><p>바텐더가 당신의 오늘에 가장 어울리는<br/>한 잔과 음악을 추천해드립니다.</p></div><AgentSearchPanel onSearch={onAgentSearch}/><section className="pref-section mood-theme-section"><div className="section-heading"><span>오늘의 무드 선택</span><small>하나를 선택하세요</small></div><div className="mood-theme-grid">{moodThemes.map(item => <motion.button key={item.id} whileHover={{ y:-5, scale:1.015 }} whileTap={{ scale:.98 }} onClick={() => setTheme(item.id)} className={`mood-theme-card ${theme === item.id ? 'selected' : ''}`} style={{ '--theme-gradient': item.gradient } as React.CSSProperties}><span className="theme-icon"><ThemeIcon theme={item.id}/></span><span className="theme-card-copy"><strong>{item.name}</strong><small>{item.description}</small></span><span className="theme-colors">{item.colors.map(color => <i key={color} title={color}/>)}</span></motion.button>)}</div></section><section className="pref-section"><div className="section-heading"><span>집에 있는 술</span><small>여러 개 선택 가능</small></div><div className="alcohol-grid">{alcohols.map(alcohol => <button key={alcohol} onClick={() => toggleAlcohol(alcohol)} className={`ingredient-chip ${selected.includes(alcohol) ? 'selected' : ''}`}>{selected.includes(alcohol) ? <span className="chip-check">✓</span> : <Plus size={14}/>} {alcoholLabels[alcohol]}</button>)}</div></section><section className="pref-section strength-section"><div className="section-heading"><span>원하는 도수</span><small>{strengthLabels[strength]}</small></div><div className="strength-picker"><input aria-label="원하는 도수" type="range" min="0" max="100" step="25" value={sliderValue} onChange={event => { const value = Number(event.target.value); setStrength(value < 38 ? 'Light' : value > 62 ? 'Strong' : 'Medium') }} /><div className="strength-options">{(['Light','Medium','Strong'] as Strength[]).map(s => <button key={s} onClick={() => setStrength(s)} className={strength === s ? 'selected' : ''}><span>{s === strength ? '●' : '○'}</span>{strengthLabels[s]}</button>)}</div></div></section><div className="selected-theme-note" style={{ background: selectedTheme.gradient }}><span><ThemeIcon theme={selectedTheme.id}/></span><p><b>{selectedTheme.name}</b> 무드로 오늘의 바를 만들게요.</p></div><Button onClick={() => onFind(theme, selected, strength)} icon={<Sparkles size={16}/>} className="find-btn">무드 추천받기</Button></main></div> }
+function AgentSearchPanel({
+  onSearch,
+}: {
+  onSearch: (
+    message: string,
+  ) => Promise<{ status: "success" | "empty"; reason?: string }>;
+}) {
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState<AgentSearchState>("idle");
+  const [message, setMessage] = useState("");
+  const submit = async () => {
+    const value = query.trim();
+    if (!value || state === "loading") return;
+    setState("loading");
+    setMessage("");
+    try {
+      const outcome = await onSearch(value);
+      setState(outcome.status);
+      setMessage(
+        outcome.reason ||
+          (outcome.status === "empty"
+            ? "조건에 맞는 칵테일을 찾지 못했어요."
+            : "AI가 오늘의 무드와 도수를 선택했어요."),
+      );
+    } catch (error) {
+      setState("error");
+      setMessage(
+        error instanceof Error ? error.message : "AI 검색을 사용할 수 없어요.",
+      );
+    }
+  };
+  return (
+    <section
+      className={`agent-search-panel agent-search-${state}`}
+      aria-labelledby="agent-search-title"
+    >
+      <div className="agent-search-heading">
+        <div>
+          <span className="eyebrow left">AI BAR SEARCH</span>
+          <h3 id="agent-search-title">원하는 한 잔을 말해주세요</h3>
+        </div>
+        <Search size={20} />
+      </div>
+      <div className="agent-search-form">
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (state !== "idle") {
+              setState("idle");
+              setMessage("");
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void submit();
+          }}
+          placeholder="예: 상큼하고 가벼운 럼 칵테일 추천해줘"
+          aria-label="자연어 칵테일 검색"
+        />
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!query.trim() || state === "loading"}
+        >
+          {state === "loading" ? (
+            <>
+              <LoaderCircle size={17} className="spin" /> AI 검색 중
+            </>
+          ) : (
+            <>
+              <Search size={17} /> 검색
+            </>
+          )}
+        </button>
+      </div>
+      {message && (
+        <p className="agent-search-message" role="status" aria-live="polite">
+          {message}
+        </p>
+      )}
+    </section>
+  );
+}
 
-function Loading({ onDone }: { onDone: () => void }) { useEffect(() => { const timer = window.setTimeout(onDone, 2000); return () => window.clearTimeout(timer) }, [onDone]); return <div className="screen loading-screen"><Header/><main className="loading-content"><div className="shaker"><div className="shaker-cap"/><div className="shaker-body"><div className="shaker-glass"/><div className="shaker-shine"/></div><div className="shaker-shadow"/></div><div className="loading-dots"><span/><span/><span/></div><h2>바텐더가<br/><em>당신의 오늘을 위한 한 잔과 음악을 준비하고 있습니다.</em></h2><p>무드를 읽고, 풍미와 분위기의 균형을 맞추는 중이에요.</p></main></div> }
+function Preferences({
+  initialTheme,
+  initialAvailable,
+  initialStrength,
+  onFind,
+  onAgentSearch,
+}: {
+  initialTheme: MoodTheme;
+  initialAvailable: Alcohol[];
+  initialStrength: Strength;
+  onFind: (theme: MoodTheme, a: Alcohol[], s: Strength) => void;
+  onAgentSearch: (
+    message: string,
+  ) => Promise<{ status: "success" | "empty"; reason?: string }>;
+}) {
+  const [theme, setTheme] = useState<MoodTheme>(initialTheme);
+  const [selected, setSelected] = useState<Alcohol[]>(initialAvailable);
+  const [strength, setStrength] = useState<Strength>(initialStrength);
+  const selectedTheme = themeById(theme);
+  const toggleAlcohol = (a: Alcohol) =>
+    setSelected((v) => (v.includes(a) ? v.filter((x) => x !== a) : [...v, a]));
+  const sliderValue =
+    strength === "Light" ? 25 : strength === "Strong" ? 75 : 50;
+  return (
+    <div className="screen">
+      <Header back />
+      <main className="preferences mood-preferences">
+        <div className="section-intro">
+          <span className="step-label">
+            01 <i /> 03
+          </span>
+          <h2>
+            오늘,
+            <br />
+            <em>어떤 무드와 함께하고 싶나요?</em>
+          </h2>
+          <p>
+            바텐더가 당신의 오늘에 가장 어울리는
+            <br />한 잔과 음악을 추천해드립니다.
+          </p>
+        </div>
+        <AgentSearchPanel onSearch={onAgentSearch} />
+        <section className="pref-section mood-theme-section">
+          <div className="section-heading">
+            <span>오늘의 무드 선택</span>
+            <small>하나를 선택하세요</small>
+          </div>
+          <div className="mood-theme-grid">
+            {moodThemes.map((item) => (
+              <motion.button
+                key={item.id}
+                data-mood-theme={item.id}
+                whileHover={{ y: -5, scale: 1.015 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setTheme(item.id)}
+                className={`mood-theme-card ${theme === item.id ? "selected" : ""}`}
+                style={
+                  { "--theme-gradient": item.gradient } as React.CSSProperties
+                }
+              >
+                <span className="theme-icon">
+                  <ThemeIcon theme={item.id} />
+                </span>
+                <span className="theme-card-copy">
+                  <strong>{item.name}</strong>
+                  <small>{item.description}</small>
+                </span>
+                <span className="theme-colors">
+                  {item.colors.map((color) => (
+                    <i key={color} title={color} />
+                  ))}
+                </span>
+              </motion.button>
+            ))}
+          </div>
+        </section>
+        <section className="pref-section">
+          <div className="section-heading">
+            <span>집에 있는 술</span>
+            <small>여러 개 선택 가능</small>
+          </div>
+          <div className="alcohol-grid">
+            {alcohols.map((alcohol) => (
+              <button
+                key={alcohol}
+                data-alcohol={alcohol}
+                onClick={() => toggleAlcohol(alcohol)}
+                className={`ingredient-chip ${selected.includes(alcohol) ? "selected" : ""}`}
+              >
+                {selected.includes(alcohol) ? (
+                  <span className="chip-check">✓</span>
+                ) : (
+                  <Plus size={14} />
+                )}{" "}
+                {alcoholLabels[alcohol]}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section className="pref-section strength-section">
+          <div className="section-heading">
+            <span>원하는 도수</span>
+            <small>{strengthLabels[strength]}</small>
+          </div>
+          <div className="strength-picker">
+            <input
+              aria-label="원하는 도수"
+              type="range"
+              min="0"
+              max="100"
+              step="25"
+              value={sliderValue}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                setStrength(
+                  value < 38 ? "Light" : value > 62 ? "Strong" : "Medium",
+                );
+              }}
+            />
+            <div className="strength-options">
+              {(["Light", "Medium", "Strong"] as Strength[]).map((s) => (
+                <button
+                  key={s}
+                  data-strength={s}
+                  onClick={() => setStrength(s)}
+                  className={strength === s ? "selected" : ""}
+                >
+                  <span>{s === strength ? "●" : "○"}</span>
+                  {strengthLabels[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+        <div
+          className="selected-theme-note"
+          style={{ background: selectedTheme.gradient }}
+        >
+          <span>
+            <ThemeIcon theme={selectedTheme.id} />
+          </span>
+          <p>
+            <b>{selectedTheme.name}</b> 무드로 오늘의 바를 만들게요.
+          </p>
+        </div>
+        <Button
+          onClick={() => onFind(theme, selected, strength)}
+          icon={<Sparkles size={16} />}
+          className="find-btn"
+        >
+          무드 추천받기
+        </Button>
+      </main>
+    </div>
+  );
+}
 
-function RecipeCard({ cocktail }: { cocktail: Cocktail }) { const [simple, setSimple] = useState(false); const ingredients = simple ? cocktail.ingredients.slice(0, 3) : cocktail.ingredients; const steps = simple ? cocktail.steps.slice(0, 2) : cocktail.steps; return <section className="recipe-card"><div className="recipe-head"><span>레시피</span><div className="recipe-head-actions"><button type="button" className={`recipe-mode-toggle ${simple ? 'on' : ''}`} aria-pressed={simple} onClick={() => setSimple(value => !value)}><span className="recipe-toggle-track"><i/></span>간단한 레시피</button><span><Clock3 size={14}/> {simple ? '약 2분' : cocktail.time.replace('min','분')}</span></div></div><div className="recipe-ingredients"><div className="recipe-subhead"><h3>필요한 재료</h3><small>{simple ? '핵심 재료만' : `${ingredients.length}가지`}</small></div><ul>{ingredients.map(x => <li key={x}>{x}</li>)}</ul></div><div className="recipe-steps"><h3>{simple ? '간단하게 만드는 법' : '만드는 법'}</h3><ol>{steps.map((x,i) => <li key={x}><b>0{i+1}</b>{x}</li>)}</ol></div><div className="ratio-box"><span>배합 비율</span><b>{ingredients.slice(0, 3).map((x, i) => <i key={x}>{x.split(' ')[0]}{i < Math.min(ingredients.length, 3) - 1 ? '  ·  ' : ''}</i>)}</b></div></section> }
+function Loading({ onDone }: { onDone: () => void }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 2000);
+    return () => window.clearTimeout(timer);
+  }, [onDone]);
+  return (
+    <div className="screen loading-screen">
+      <Header />
+      <main className="loading-content">
+        <div className="shaker">
+          <div className="shaker-cap" />
+          <div className="shaker-body">
+            <div className="shaker-glass" />
+            <div className="shaker-shine" />
+          </div>
+          <div className="shaker-shadow" />
+        </div>
+        <div className="loading-dots">
+          <span />
+          <span />
+          <span />
+        </div>
+        <h2>
+          바텐더가
+          <br />
+          <em>당신의 오늘을 위한 한 잔과 음악을 준비하고 있습니다.</em>
+        </h2>
+        <p>무드를 읽고, 풍미와 분위기의 균형을 맞추는 중이에요.</p>
+      </main>
+    </div>
+  );
+}
 
-declare global { interface Window { YT?: { Player: new (element: HTMLElement, options: Record<string, unknown>) => { playVideo: () => void; pauseVideo: () => void; destroy: () => void } }; onYouTubeIframeAPIReady?: () => void } }
-function YouTubePlayer({ videoId, startSeconds, onClose }: { videoId: string; startSeconds: number; onClose: () => void }) { const host = useRef<HTMLDivElement>(null); const player = useRef<{ destroy: () => void } | null>(null); useEffect(() => { const create = () => { if (host.current && window.YT && !player.current) player.current = new window.YT.Player(host.current, { videoId, playerVars: { autoplay: 1, start: startSeconds, modestbranding: 1, rel: 0, playsinline: 1 } }) }; if (window.YT) create(); else { const previous = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { previous?.(); create() }; const script = document.querySelector('script[data-youtube-api]') || document.createElement('script'); if (!script.getAttribute('src')) { script.setAttribute('src','https://www.youtube.com/iframe_api'); script.setAttribute('data-youtube-api','true'); document.body.appendChild(script) } } return () => { player.current?.destroy(); player.current = null } }, [videoId, startSeconds]); return <div className="youtube-player"><div ref={host} className="youtube-frame"/><button type="button" className="player-close" onClick={onClose} aria-label="플레이어 닫기"><X size={15}/></button></div> }
-function MusicCard({ themeId, cocktail }: { themeId: MoodTheme; cocktail: Cocktail }) { const options = musicVariants[themeId]; const music = options[cocktail.id % options.length]; const [playing, setPlaying] = useState(false); return <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .32, duration: .55 }} className="music-card">{playing ? <YouTubePlayer videoId={music.videoId} startSeconds={music.startSeconds} onClose={() => setPlaying(false)}/> : <><div className="album-art"><img src={music.image} alt={`${music.title} 썸네일`} /><div className="album-overlay"><Music2 size={26}/></div></div><div className="playlist-copy"><small>오늘의 플레이리스트</small><h3>{music.title}</h3><p>{music.genre} · {music.description}</p></div><button className="play-btn" onClick={() => setPlaying(true)} aria-label={`${music.title} 무드 음악 재생`}><Play size={16} fill="currentColor"/></button></>}</motion.div> }
-function Result({ cocktail, saved, themeId, onSave, onAnother, onBack }: { cocktail: Cocktail; saved: boolean; themeId: MoodTheme; onSave: () => void; onAnother: () => void; onBack: () => void }) { const localized = useMemo(() => localizeCocktail(cocktail), [cocktail]); const theme = themeById(themeId); const tip = themeId === 'rainy-day' ? '창밖의 빗소리를 상상하며 잔을 천천히 데워보세요.' : themeId === 'escape' ? '민트 잎을 손바닥으로 가볍게 눌러 향을 깨워보세요.' : themeId === 'after-dark' ? '첫 모금 전 잔을 가볍게 돌려 깊은 향부터 느껴보세요.' : '가니시 하나만 더해도 오늘의 무드가 훨씬 선명해져요.'; return <div className={`screen result-screen result-theme-${themeId}`}><Header back={true} onBack={onBack}/><main className="result-page"><motion.div initial={{ opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .6, ease: 'easeOut' }} className="recommendation-intro"><span className="eyebrow left">오늘의 무드 · {theme.name}</span><p className="mood-ritual">{moodRituals[themeId]}</p><div className="result-hero"><CocktailArt cocktail={localized} large/><div className="result-copy"><div className="tag-row"><span className="tag tag-gold">{theme.name}</span><span className="tag">{strengthLabels[localized.level]}</span></div><h1>{localized.name}</h1><p>{localized.description}</p><div className="reason"><Sparkles size={15}/><span><b>{theme.description}</b> 무드에 어울리는 <b>{alcoholLabels[localized.alcohol]}</b>을 골랐어요.</span></div></div></div></motion.div><motion.div initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .12, duration: .55 }}><RecipeCard cocktail={localized}/></motion.div><motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .22, duration: .55 }} className="pairing"><div className="section-heading"><span>오늘의 플레이리스트</span><small><Music2 size={14}/> 무드에 맞춰 골랐어요</small></div><MusicCard themeId={themeId} cocktail={localized}/></motion.section><motion.section initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .42, duration: .55 }} className="bartender-tip"><div className="tip-icon"><Martini size={17}/></div><div><small>바텐더 팁</small><p>{tip}</p></div></motion.section><div className="result-actions"><Button variant={saved ? 'quiet' : 'ghost'} onClick={onSave} icon={<Heart size={18} fill={saved ? 'currentColor' : 'none'}/>} className={saved ? 'saved-btn' : ''}>{saved ? '즐겨찾기에 저장됨' : '레시피 저장'}</Button><Button variant="primary" onClick={onAnother} icon={<RotateCw size={17}/>}>다른 칵테일 추천</Button></div></main></div> }
+function RecipeCard({ cocktail }: { cocktail: Cocktail }) {
+  const [simple, setSimple] = useState(false);
+  const ingredients = simple
+    ? cocktail.ingredients.slice(0, 3)
+    : cocktail.ingredients;
+  const steps = simple ? cocktail.steps.slice(0, 2) : cocktail.steps;
+  return (
+    <section className="recipe-card">
+      <div className="recipe-head">
+        <span>레시피</span>
+        <div className="recipe-head-actions">
+          <button
+            type="button"
+            className={`recipe-mode-toggle ${simple ? "on" : ""}`}
+            aria-pressed={simple}
+            onClick={() => setSimple((value) => !value)}
+          >
+            <span className="recipe-toggle-track">
+              <i />
+            </span>
+            간단한 레시피
+          </button>
+          <span>
+            <Clock3 size={14} />{" "}
+            {simple ? "약 2분" : cocktail.time.replace("min", "분")}
+          </span>
+        </div>
+      </div>
+      <div className="recipe-ingredients">
+        <div className="recipe-subhead">
+          <h3>필요한 재료</h3>
+          <small>{simple ? "핵심 재료만" : `${ingredients.length}가지`}</small>
+        </div>
+        <ul>
+          {ingredients.map((x) => (
+            <li key={x}>{x}</li>
+          ))}
+        </ul>
+      </div>
+      <div className="recipe-steps">
+        <h3>{simple ? "간단하게 만드는 법" : "만드는 법"}</h3>
+        <ol>
+          {steps.map((x, i) => (
+            <li key={x}>
+              <b>0{i + 1}</b>
+              {x}
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="ratio-box">
+        <span>배합 비율</span>
+        <b>
+          {ingredients.slice(0, 3).map((x, i) => (
+            <i key={x}>
+              {x.split(" ")[0]}
+              {i < Math.min(ingredients.length, 3) - 1 ? "  ·  " : ""}
+            </i>
+          ))}
+        </b>
+      </div>
+    </section>
+  );
+}
 
-function Favorites({ favorites, remove, open }: { favorites: Cocktail[]; remove: (id:number) => void; open: (c:Cocktail) => void }) { return <div className="screen"><Header/><main className="favorites-page"><div className="page-heading"><span className="eyebrow left">나의 바 컬렉션</span><h1>저장한 레시피<span className="gold-dot">.</span></h1><p>좋은 한 잔은 오래 간직할 가치가 있으니까요.</p></div>{favorites.length ? <div className="favorites-grid">{favorites.map(c => { const local = localizeCocktail(c); return <motion.article layout key={c.id} className="favorite-card"><button className="remove-btn" onClick={() => remove(c.id)} aria-label={`${local.name} 삭제`}><Trash2 size={15}/></button><button className="favorite-open" onClick={() => open(c)}><CocktailArt cocktail={local}/><div className="favorite-info"><span>{moodLabels[local.mood]} · {strengthLabels[local.level]}</span><h2>{local.name}</h2><p>{local.description}</p><span className="view-link">레시피 보기 <ChevronRight size={14}/></span></div></button></motion.article>})}</div> : <div className="empty-state"><div className="empty-icon"><Heart size={22}/></div><h2>아직 비어 있어요.</h2><p>마음에 드는 칵테일을 저장하면 나만의 바 컬렉션이 완성돼요.</p><Button onClick={() => open(cocktails[1])} variant="ghost" icon={<ChevronRight size={16}/>}>칵테일 둘러보기</Button></div>}</main></div> }
-function SettingsPage({ dark, setDark, animations, setAnimations, openAbout }: { dark:boolean; setDark:(v:boolean)=>void; animations:boolean; setAnimations:(v:boolean)=>void; openAbout:()=>void }) { return <div className="screen"><Header/><main className="settings-page"><div className="page-heading"><span className="eyebrow left">나만의 바 설정</span><h1>설정<span className="gold-dot">.</span></h1><p>조용한 밤을 위한 나만의 취향.</p></div><section className="settings-list"><div className="setting-item"><div className="setting-icon"><Sun size={18}/></div><div><b>테마</b><small>어두운 라운지와 밝은 화면 사이</small></div><button className={`toggle ${dark ? 'on' : ''}`} onClick={() => setDark(!dark)} aria-label="테마 전환"><span/></button></div><div className="setting-item"><div className="setting-icon"><Zap size={18}/></div><div><b>모션 효과</b><small>화면 전환과 칵테일 애니메이션</small></div><button className={`toggle ${animations ? 'on' : ''}`} onClick={() => setAnimations(!animations)} aria-label="모션 효과 전환"><span/></button></div><button className="setting-item setting-button" onClick={openAbout}><div className="setting-icon"><Info size={18}/></div><div><b>바텐더 소개</b><small>버전 1.0 · 오늘을 위한 작은 바</small></div><ChevronRight size={18}/></button></section><div className="settings-note"><Martini size={18}/><p>오늘 하루를 마무리하는<br/>나만의 바를 만나보세요.</p></div></main></div> }
-function About({ onBack }: { onBack:()=>void }) { return <div className="screen"><Header back onBack={onBack}/><main className="about-page"><div className="about-mark"><Logo compact/></div><span className="eyebrow left">바텐더 이야기</span><h1>좋은 칵테일.<br/><em>더 좋은 순간.</em></h1><p>바텐더는 지금의 기분과 집에 있는 술을 바탕으로, 오늘 밤에 꼭 맞는 칵테일과 음악을 제안하는 나만의 작은 바입니다.</p><div className="about-stat"><div><b>20</b><span>가지<br/>레시피</span></div><div><b>∞</b><span>나만의<br/>조합</span></div><div><b>0</b><span>틀린<br/>선택</span></div></div><p className="about-foot">바텐더 · 호기심으로 만들었습니다<br/>© 2024 Bartender Studio</p></main></div> }
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        element: HTMLElement,
+        options: Record<string, unknown>,
+      ) => {
+        playVideo: () => void;
+        pauseVideo: () => void;
+        destroy: () => void;
+      };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+function YouTubePlayer({
+  videoId,
+  startSeconds,
+  onClose,
+}: {
+  videoId: string;
+  startSeconds: number;
+  onClose: () => void;
+}) {
+  const host = useRef<HTMLDivElement>(null);
+  const player = useRef<{ destroy: () => void } | null>(null);
+  useEffect(() => {
+    const create = () => {
+      if (host.current && window.YT && !player.current)
+        player.current = new window.YT.Player(host.current, {
+          videoId,
+          playerVars: {
+            autoplay: 1,
+            start: startSeconds,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+          },
+        });
+    };
+    if (window.YT) create();
+    else {
+      const previous = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previous?.();
+        create();
+      };
+      const script =
+        document.querySelector("script[data-youtube-api]") ||
+        document.createElement("script");
+      if (!script.getAttribute("src")) {
+        script.setAttribute("src", "https://www.youtube.com/iframe_api");
+        script.setAttribute("data-youtube-api", "true");
+        document.body.appendChild(script);
+      }
+    }
+    return () => {
+      player.current?.destroy();
+      player.current = null;
+    };
+  }, [videoId, startSeconds]);
+  return (
+    <div className="youtube-player">
+      <div ref={host} className="youtube-frame" />
+      <button
+        type="button"
+        className="player-close"
+        onClick={onClose}
+        aria-label="플레이어 닫기"
+      >
+        <X size={15} />
+      </button>
+    </div>
+  );
+}
+function MusicCard({
+  themeId,
+  cocktail,
+}: {
+  themeId: MoodTheme;
+  cocktail: Cocktail;
+}) {
+  const options = musicVariants[themeId];
+  const music = options[cocktail.id % options.length];
+  const [playing, setPlaying] = useState(false);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.32, duration: 0.55 }}
+      className="music-card"
+    >
+      {playing ? (
+        <YouTubePlayer
+          videoId={music.videoId}
+          startSeconds={music.startSeconds}
+          onClose={() => setPlaying(false)}
+        />
+      ) : (
+        <>
+          <div className="album-art">
+            <img src={music.image} alt={`${music.title} 썸네일`} />
+            <div className="album-overlay">
+              <Music2 size={26} />
+            </div>
+          </div>
+          <div className="playlist-copy">
+            <small>오늘의 플레이리스트</small>
+            <h3>{music.title}</h3>
+            <p>
+              {music.genre} · {music.description}
+            </p>
+          </div>
+          <button
+            className="play-btn"
+            onClick={() => setPlaying(true)}
+            aria-label={`${music.title} 무드 음악 재생`}
+          >
+            <Play size={16} fill="currentColor" />
+          </button>
+        </>
+      )}
+    </motion.div>
+  );
+}
+function Result({
+  cocktail,
+  saved,
+  themeId,
+  onSave,
+  onAnother,
+  onBack,
+}: {
+  cocktail: Cocktail;
+  saved: boolean;
+  themeId: MoodTheme;
+  onSave: () => void;
+  onAnother: () => void;
+  onBack: () => void;
+}) {
+  const localized = useMemo(() => localizeCocktail(cocktail), [cocktail]);
+  const theme = themeById(themeId);
+  const tip =
+    themeId === "rainy-day"
+      ? "창밖의 빗소리를 상상하며 잔을 천천히 데워보세요."
+      : themeId === "escape"
+        ? "민트 잎을 손바닥으로 가볍게 눌러 향을 깨워보세요."
+        : themeId === "after-dark"
+          ? "첫 모금 전 잔을 가볍게 돌려 깊은 향부터 느껴보세요."
+          : "가니시 하나만 더해도 오늘의 무드가 훨씬 선명해져요.";
+  return (
+    <div className={`screen result-screen result-theme-${themeId}`}>
+      <Header back={true} onBack={onBack} />
+      <main className="result-page">
+        <motion.div
+          initial={{ opacity: 0, y: 35 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="recommendation-intro"
+        >
+          <span className="eyebrow left">오늘의 무드 · {theme.name}</span>
+          <p className="mood-ritual">{moodRituals[themeId]}</p>
+          <div className="result-hero">
+            <CocktailArt cocktail={localized} large />
+            <div className="result-copy">
+              <div className="tag-row">
+                <span className="tag tag-gold">{theme.name}</span>
+                <span className="tag">{strengthLabels[localized.level]}</span>
+              </div>
+              <h1>{localized.name}</h1>
+              <p>{localized.description}</p>
+              <div className="reason">
+                <Sparkles size={15} />
+                <span>
+                  <b>{theme.description}</b> 무드에 어울리는{" "}
+                  <b>{alcoholLabels[localized.alcohol]}</b>을 골랐어요.
+                </span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.55 }}
+        >
+          <RecipeCard cocktail={localized} />
+        </motion.div>
+        <motion.section
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22, duration: 0.55 }}
+          className="pairing"
+        >
+          <div className="section-heading">
+            <span>오늘의 플레이리스트</span>
+            <small>
+              <Music2 size={14} /> 무드에 맞춰 골랐어요
+            </small>
+          </div>
+          <MusicCard themeId={themeId} cocktail={localized} />
+        </motion.section>
+        <motion.section
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.42, duration: 0.55 }}
+          className="bartender-tip"
+        >
+          <div className="tip-icon">
+            <Martini size={17} />
+          </div>
+          <div>
+            <small>바텐더 팁</small>
+            <p>{tip}</p>
+          </div>
+        </motion.section>
+        <div className="result-actions">
+          <Button
+            variant={saved ? "quiet" : "ghost"}
+            onClick={onSave}
+            icon={<Heart size={18} fill={saved ? "currentColor" : "none"} />}
+            className={saved ? "saved-btn" : ""}
+          >
+            {saved ? "즐겨찾기에 저장됨" : "레시피 저장"}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onAnother}
+            icon={<RotateCw size={17} />}
+          >
+            다른 칵테일 추천
+          </Button>
+        </div>
+      </main>
+    </div>
+  );
+}
 
-export default function App() { const [screen, setScreen] = useState<Screen>('welcome'); const [themeId, setThemeId] = useState<MoodTheme>(() => readStorage<MoodTheme>('ai-bartender-theme', 'golden-hour')); const [mood, setMood] = useState<Mood>(() => readStorage<Mood>('ai-bartender-mood', 'Happy')); const [available, setAvailable] = useState<Alcohol[]>(() => readStorage<Alcohol[]>('ai-bartender-available', [])); const [strength, setStrength] = useState<Strength>(() => readStorage<Strength>('ai-bartender-strength', 'Medium')); const [result, setResult] = useState<Cocktail>(() => { const stored = readStorage<{ id: number } | null>('ai-bartender-result', null); return cocktails.find(c => c.id === stored?.id) || cocktails[1] }); const [favorites, setFavorites] = useState<Cocktail[]>(() => readStorage<Cocktail[]>('ai-bartender-favorites', [])); const [dark, setDark] = useState(() => readStorage<boolean>('ai-bartender-dark', true)); const [animations, setAnimations] = useState(() => readStorage<boolean>('ai-bartender-animations', true)); useEffect(() => { localStorage.setItem('ai-bartender-favorites', JSON.stringify(favorites)) }, [favorites]); useEffect(() => { localStorage.setItem('ai-bartender-theme', JSON.stringify(themeId)); localStorage.setItem('ai-bartender-mood', JSON.stringify(mood)); localStorage.setItem('ai-bartender-available', JSON.stringify(available)); localStorage.setItem('ai-bartender-strength', JSON.stringify(strength)); localStorage.setItem('ai-bartender-result', JSON.stringify({ id: result.id })) }, [themeId, mood, available, strength, result]); useEffect(() => { localStorage.setItem('ai-bartender-dark', JSON.stringify(dark)); localStorage.setItem('ai-bartender-animations', JSON.stringify(animations)) }, [dark, animations]); const recommend = (nextTheme = themeId, nextAvailable = available, nextStrength = strength) => { const profile = themeById(nextTheme); const shelf = nextAvailable.length ? nextAvailable : profile.preferredAlcohol; const matches = cocktails.filter(c => c.mood === profile.legacyMood && shelf.includes(c.alcohol) && c.level === nextStrength); const fallback = cocktails.filter(c => shelf.includes(c.alcohol) && (c.mood === profile.legacyMood || c.level === nextStrength)); const themed = cocktails.filter(c => c.mood === profile.legacyMood && c.level === nextStrength); const pool = matches.length ? matches : fallback.length ? fallback : themed.length ? themed : cocktails; setThemeId(nextTheme); setMood(profile.legacyMood); setAvailable(nextAvailable); setStrength(nextStrength); setResult(pool[Math.floor(Math.random() * pool.length)]); setScreen('loading') }; const agentSearch = async (message: string): Promise<{ status: 'success' | 'empty'; reason?: string }> => { const match = matchNaturalLanguageMood(message); const selectedAlcohols = match.alcohol ? [match.alcohol] : available; const selectedStrength = match.strength || strength; setThemeId(match.theme.id); setMood(match.theme.legacyMood); setAvailable(selectedAlcohols); setStrength(selectedStrength); setScreen('preferences'); return { status:'success', reason:`${match.theme.name} 무드를 선택했어요.${match.alcohol ? ` ${alcoholLabels[match.alcohol]} 기준으로 맞췄어요.` : ''}` } }; const another = () => { const profile = themeById(themeId); const shelf = available.length ? available : profile.preferredAlcohol; const pool = cocktails.filter(c => c.id !== result.id && (shelf.includes(c.alcohol) || c.mood === profile.legacyMood)); setResult(pool[Math.floor(Math.random() * pool.length)] || cocktails[0]) }; const save = () => setFavorites(v => v.some(c => c.id === result.id) ? v.filter(c => c.id !== result.id) : [result, ...v]); const isSaved = favorites.some(c => c.id === result.id); const motionProps = animations ? {} : { initial:false, animate:false }; return <div className={dark ? 'app-shell' : 'app-shell light-theme'}><AnimatePresence mode="wait"><motion.div key={screen} {...motionProps} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }} transition={{ duration:.3 }} className="page-wrap">{screen === 'welcome' && <Welcome start={() => setScreen('preferences')}/>} {screen === 'preferences' && <Preferences initialTheme={themeId} initialAvailable={available} initialStrength={strength} onFind={recommend} onAgentSearch={agentSearch}/>} {screen === 'loading' && <Loading onDone={() => setScreen('result')}/>} {screen === 'result' && <Result cocktail={result} saved={isSaved} themeId={themeId} onSave={save} onAnother={another} onBack={() => setScreen('preferences')}/>} {screen === 'favorites' && <Favorites favorites={favorites} remove={id => setFavorites(v => v.filter(c => c.id !== id))} open={c => { const nextTheme = moodThemes.find(theme => theme.legacyMood === c.mood && theme.preferredAlcohol.includes(c.alcohol)) || moodThemes[0]; setThemeId(nextTheme.id); setMood(c.mood); setResult(c); setScreen('result') }}/>} {screen === 'settings' && <SettingsPage dark={dark} setDark={setDark} animations={animations} setAnimations={setAnimations} openAbout={() => setScreen('about')}/>} {screen === 'about' && <About onBack={() => setScreen('settings')}/>}</motion.div></AnimatePresence>{screen !== 'loading' && screen !== 'welcome' && screen !== 'preferences' && <Nav screen={screen} navigate={setScreen}/>}</div> }
+function Favorites({
+  favorites,
+  remove,
+  open,
+}: {
+  favorites: Cocktail[];
+  remove: (id: number) => void;
+  open: (c: Cocktail) => void;
+}) {
+  return (
+    <div className="screen">
+      <Header />
+      <main className="favorites-page">
+        <div className="page-heading">
+          <span className="eyebrow left">나의 바 컬렉션</span>
+          <h1>
+            저장한 레시피<span className="gold-dot">.</span>
+          </h1>
+          <p>좋은 한 잔은 오래 간직할 가치가 있으니까요.</p>
+        </div>
+        {favorites.length ? (
+          <div className="favorites-grid">
+            {favorites.map((c) => {
+              const local = localizeCocktail(c);
+              return (
+                <motion.article layout key={c.id} className="favorite-card">
+                  <button
+                    className="remove-btn"
+                    onClick={() => remove(c.id)}
+                    aria-label={`${local.name} 삭제`}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                  <button className="favorite-open" onClick={() => open(c)}>
+                    <CocktailArt cocktail={local} />
+                    <div className="favorite-info">
+                      <span>
+                        {moodLabels[local.mood]} · {strengthLabels[local.level]}
+                      </span>
+                      <h2>{local.name}</h2>
+                      <p>{local.description}</p>
+                      <span className="view-link">
+                        레시피 보기 <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </button>
+                </motion.article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon">
+              <Heart size={22} />
+            </div>
+            <h2>아직 비어 있어요.</h2>
+            <p>마음에 드는 칵테일을 저장하면 나만의 바 컬렉션이 완성돼요.</p>
+            <Button
+              onClick={() => open(cocktails[1])}
+              variant="ghost"
+              icon={<ChevronRight size={16} />}
+            >
+              칵테일 둘러보기
+            </Button>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+function SettingsPage({
+  dark,
+  setDark,
+  animations,
+  setAnimations,
+  openAbout,
+}: {
+  dark: boolean;
+  setDark: (v: boolean) => void;
+  animations: boolean;
+  setAnimations: (v: boolean) => void;
+  openAbout: () => void;
+}) {
+  return (
+    <div className="screen">
+      <Header />
+      <main className="settings-page">
+        <div className="page-heading">
+          <span className="eyebrow left">나만의 바 설정</span>
+          <h1>
+            설정<span className="gold-dot">.</span>
+          </h1>
+          <p>조용한 밤을 위한 나만의 취향.</p>
+        </div>
+        <section className="settings-list">
+          <div className="setting-item">
+            <div className="setting-icon">
+              <Sun size={18} />
+            </div>
+            <div>
+              <b>테마</b>
+              <small>어두운 라운지와 밝은 화면 사이</small>
+            </div>
+            <button
+              className={`toggle ${dark ? "on" : ""}`}
+              onClick={() => setDark(!dark)}
+              aria-label="테마 전환"
+            >
+              <span />
+            </button>
+          </div>
+          <div className="setting-item">
+            <div className="setting-icon">
+              <Zap size={18} />
+            </div>
+            <div>
+              <b>모션 효과</b>
+              <small>화면 전환과 칵테일 애니메이션</small>
+            </div>
+            <button
+              className={`toggle ${animations ? "on" : ""}`}
+              onClick={() => setAnimations(!animations)}
+              aria-label="모션 효과 전환"
+            >
+              <span />
+            </button>
+          </div>
+          <button className="setting-item setting-button" onClick={openAbout}>
+            <div className="setting-icon">
+              <Info size={18} />
+            </div>
+            <div>
+              <b>바텐더 소개</b>
+              <small>버전 1.0 · 오늘을 위한 작은 바</small>
+            </div>
+            <ChevronRight size={18} />
+          </button>
+        </section>
+        <div className="settings-note">
+          <Martini size={18} />
+          <p>
+            오늘 하루를 마무리하는
+            <br />
+            나만의 바를 만나보세요.
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
+function About({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="screen">
+      <Header back onBack={onBack} />
+      <main className="about-page">
+        <div className="about-mark">
+          <Logo compact />
+        </div>
+        <span className="eyebrow left">바텐더 이야기</span>
+        <h1>
+          좋은 칵테일.
+          <br />
+          <em>더 좋은 순간.</em>
+        </h1>
+        <p>
+          바텐더는 지금의 기분과 집에 있는 술을 바탕으로, 오늘 밤에 꼭 맞는
+          칵테일과 음악을 제안하는 나만의 작은 바입니다.
+        </p>
+        <div className="about-stat">
+          <div>
+            <b>20</b>
+            <span>
+              가지
+              <br />
+              레시피
+            </span>
+          </div>
+          <div>
+            <b>∞</b>
+            <span>
+              나만의
+              <br />
+              조합
+            </span>
+          </div>
+          <div>
+            <b>0</b>
+            <span>
+              틀린
+              <br />
+              선택
+            </span>
+          </div>
+        </div>
+        <p className="about-foot">
+          바텐더 · 호기심으로 만들었습니다
+          <br />© 2024 Bartender Studio
+        </p>
+      </main>
+    </div>
+  );
+}
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("welcome");
+  const [themeId, setThemeId] = useState<MoodTheme>(() =>
+    readStorage<MoodTheme>("ai-bartender-theme", "golden-hour"),
+  );
+  const [mood, setMood] = useState<Mood>(() =>
+    readStorage<Mood>("ai-bartender-mood", "Happy"),
+  );
+  const [available, setAvailable] = useState<Alcohol[]>(() =>
+    readStorage<Alcohol[]>("ai-bartender-available", []),
+  );
+  const [strength, setStrength] = useState<Strength>(() =>
+    readStorage<Strength>("ai-bartender-strength", "Medium"),
+  );
+  const [result, setResult] = useState<Cocktail>(() => {
+    const stored = readStorage<{ id: number } | null>(
+      "ai-bartender-result",
+      null,
+    );
+    return cocktails.find((c) => c.id === stored?.id) || cocktails[1];
+  });
+  const [favorites, setFavorites] = useState<Cocktail[]>(() =>
+    readStorage<Cocktail[]>("ai-bartender-favorites", []),
+  );
+  const [dark, setDark] = useState(() =>
+    readStorage<boolean>("ai-bartender-dark", true),
+  );
+  const [animations, setAnimations] = useState(() =>
+    readStorage<boolean>("ai-bartender-animations", true),
+  );
+  useEffect(() => {
+    localStorage.setItem("ai-bartender-favorites", JSON.stringify(favorites));
+  }, [favorites]);
+  useEffect(() => {
+    localStorage.setItem("ai-bartender-theme", JSON.stringify(themeId));
+    localStorage.setItem("ai-bartender-mood", JSON.stringify(mood));
+    localStorage.setItem("ai-bartender-available", JSON.stringify(available));
+    localStorage.setItem("ai-bartender-strength", JSON.stringify(strength));
+    localStorage.setItem(
+      "ai-bartender-result",
+      JSON.stringify({ id: result.id }),
+    );
+  }, [themeId, mood, available, strength, result]);
+  useEffect(() => {
+    localStorage.setItem("ai-bartender-dark", JSON.stringify(dark));
+    localStorage.setItem("ai-bartender-animations", JSON.stringify(animations));
+  }, [dark, animations]);
+  const recommend = (
+    nextTheme = themeId,
+    nextAvailable = available,
+    nextStrength = strength,
+  ) => {
+    const profile = themeById(nextTheme);
+    const shelf = nextAvailable.length
+      ? nextAvailable
+      : profile.preferredAlcohol;
+    const matches = cocktails.filter(
+      (c) =>
+        c.mood === profile.legacyMood &&
+        shelf.includes(c.alcohol) &&
+        c.level === nextStrength,
+    );
+    const fallback = cocktails.filter(
+      (c) =>
+        shelf.includes(c.alcohol) &&
+        (c.mood === profile.legacyMood || c.level === nextStrength),
+    );
+    const themed = cocktails.filter(
+      (c) => c.mood === profile.legacyMood && c.level === nextStrength,
+    );
+    const pool = matches.length
+      ? matches
+      : fallback.length
+        ? fallback
+        : themed.length
+          ? themed
+          : cocktails;
+    setThemeId(nextTheme);
+    setMood(profile.legacyMood);
+    setAvailable(nextAvailable);
+    setStrength(nextStrength);
+    setResult(pool[Math.floor(Math.random() * pool.length)]);
+    setScreen("loading");
+  };
+  const agentSearch = async (
+    message: string,
+  ): Promise<{ status: "success" | "empty"; reason?: string }> => {
+    const data = await requestAgent(message);
+    if (data.fallback) {
+      throw new Error("AI 연결이 어려워 기본 추천을 이용해보세요.");
+    }
+    const selection = data.selection;
+    const candidate = data.cocktails
+      ?.map((item) => cocktails.find((cocktail) => cocktail.id === item.id))
+      .find((cocktail): cocktail is Cocktail => Boolean(cocktail));
+    if (!candidate) {
+      return {
+        status: "empty",
+        reason:
+          "조건에 맞는 칵테일을 찾지 못했어요. 술 종류나 도수를 조금 넓혀보세요.",
+      };
+    }
+    const selectedAlcohols =
+      selection?.availableAlcohols?.length
+        ? selection.availableAlcohols
+        : [candidate.alcohol];
+    const selectedStrength = selection?.strength || candidate.level;
+    const nextTheme =
+      (selection?.moodTheme && themeById(selection.moodTheme)) ||
+      moodThemes.find(
+        (theme) =>
+          theme.legacyMood === (selection?.mood || candidate.mood) &&
+          theme.preferredAlcohol.includes(candidate.alcohol),
+      ) || moodThemes[0];
+    setThemeId(nextTheme.id);
+    setMood(nextTheme.legacyMood);
+    setAvailable(selectedAlcohols);
+    setStrength(selectedStrength);
+    clickPreferenceSelection(nextTheme.id, selectedStrength, selectedAlcohols);
+    setScreen("preferences");
+    return {
+      status: "success",
+      reason: `${nextTheme.name} 무드와 ${strengthLabels[selectedStrength]} 도수를 선택했어요.`,
+    };
+  };
+  const another = () => {
+    const profile = themeById(themeId);
+    const shelf = available.length ? available : profile.preferredAlcohol;
+    const pool = cocktails.filter(
+      (c) =>
+        c.id !== result.id &&
+        (shelf.includes(c.alcohol) || c.mood === profile.legacyMood),
+    );
+    setResult(pool[Math.floor(Math.random() * pool.length)] || cocktails[0]);
+  };
+  const save = () =>
+    setFavorites((v) =>
+      v.some((c) => c.id === result.id)
+        ? v.filter((c) => c.id !== result.id)
+        : [result, ...v],
+    );
+  const isSaved = favorites.some((c) => c.id === result.id);
+  const motionProps = animations ? {} : { initial: false, animate: false };
+  return (
+    <div className={dark ? "app-shell" : "app-shell light-theme"}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={screen}
+          {...motionProps}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.3 }}
+          className="page-wrap"
+        >
+          {screen === "welcome" && (
+            <Welcome start={() => setScreen("preferences")} />
+          )}{" "}
+          {screen === "preferences" && (
+            <Preferences
+              initialTheme={themeId}
+              initialAvailable={available}
+              initialStrength={strength}
+              onFind={recommend}
+              onAgentSearch={agentSearch}
+            />
+          )}{" "}
+          {screen === "loading" && (
+            <Loading onDone={() => setScreen("result")} />
+          )}{" "}
+          {screen === "result" && (
+            <Result
+              cocktail={result}
+              saved={isSaved}
+              themeId={themeId}
+              onSave={save}
+              onAnother={another}
+              onBack={() => setScreen("preferences")}
+            />
+          )}{" "}
+          {screen === "favorites" && (
+            <Favorites
+              favorites={favorites}
+              remove={(id) => setFavorites((v) => v.filter((c) => c.id !== id))}
+              open={(c) => {
+                const nextTheme =
+                  moodThemes.find(
+                    (theme) =>
+                      theme.legacyMood === c.mood &&
+                      theme.preferredAlcohol.includes(c.alcohol),
+                  ) || moodThemes[0];
+                setThemeId(nextTheme.id);
+                setMood(c.mood);
+                setResult(c);
+                setScreen("result");
+              }}
+            />
+          )}{" "}
+          {screen === "settings" && (
+            <SettingsPage
+              dark={dark}
+              setDark={setDark}
+              animations={animations}
+              setAnimations={setAnimations}
+              openAbout={() => setScreen("about")}
+            />
+          )}{" "}
+          {screen === "about" && <About onBack={() => setScreen("settings")} />}
+        </motion.div>
+      </AnimatePresence>
+      {screen !== "loading" &&
+        screen !== "welcome" &&
+        screen !== "preferences" && (
+          <Nav screen={screen} navigate={setScreen} />
+        )}
+    </div>
+  );
+}

@@ -1,14 +1,15 @@
 import { cocktails } from '../src/data/cocktails.js'
-import type { Alcohol, Cocktail, Mood, Strength } from '../src/types.js'
+import type { Alcohol, Cocktail, Mood, MoodTheme, Strength } from '../src/types.js'
 
 declare const process: { env: Record<string, string | undefined> }
 
-type AgentRequest = { message: string; mood?: Mood; availableAlcohols?: Alcohol[]; strength?: Strength }
-type SearchInput = Pick<AgentRequest, 'mood' | 'availableAlcohols' | 'strength'> & { query?: string }
+type AgentRequest = { message: string; mood?: Mood; moodTheme?: MoodTheme; availableAlcohols?: Alcohol[]; strength?: Strength }
+type SearchInput = Pick<AgentRequest, 'mood' | 'moodTheme' | 'availableAlcohols' | 'strength'> & { query?: string }
 
 const moods = new Set<Mood>(['Happy', 'Relaxed', 'Romantic', 'Party', 'Stressed', 'Tired'])
 const alcohols = new Set<Alcohol>(['Vodka', 'Gin', 'Rum', 'Whiskey', 'Tequila', 'Brandy', 'Soju', 'Beer', 'Wine'])
 const strengths = new Set<Strength>(['Light', 'Medium', 'Strong'])
+const moodThemes = new Set<MoodTheme>(['golden-hour', 'flirt', 'soft-mood', 'after-dark', 'bold', 'escape', 'celebration', 'rainy-day', 'sweet-crush', 'chill'])
 
 const searchTool = {
   type: 'function',
@@ -20,6 +21,7 @@ const searchTool = {
       additionalProperties: false,
       properties: {
         mood: { type: 'string', enum: ['Happy', 'Relaxed', 'Romantic', 'Party', 'Stressed', 'Tired'] },
+        moodTheme: { type: 'string', enum: ['golden-hour', 'flirt', 'soft-mood', 'after-dark', 'bold', 'escape', 'celebration', 'rainy-day', 'sweet-crush', 'chill'] },
         availableAlcohols: { type: 'array', items: { type: 'string', enum: ['Vodka', 'Gin', 'Rum', 'Whiskey', 'Tequila', 'Brandy', 'Soju', 'Beer', 'Wine'] } },
         strength: { type: 'string', enum: ['Light', 'Medium', 'Strong'] },
         query: { type: 'string', maxLength: 200 },
@@ -44,6 +46,7 @@ function normalize(value: string) { return value.toLowerCase().replace(/\s+/g, '
 
 function validateSearchInput(input: SearchInput): SearchInput {
   if (input.mood !== undefined && !moods.has(input.mood)) throw new Error('invalid mood')
+  if (input.moodTheme !== undefined && !moodThemes.has(input.moodTheme)) throw new Error('invalid mood theme')
   if (input.strength !== undefined && !strengths.has(input.strength)) throw new Error('invalid strength')
   if (input.availableAlcohols !== undefined && (!Array.isArray(input.availableAlcohols) || input.availableAlcohols.some(alcohol => !alcohols.has(alcohol)))) throw new Error('invalid alcohol')
   if (input.query !== undefined && (typeof input.query !== 'string' || input.query.length > 200)) throw new Error('invalid query')
@@ -67,14 +70,15 @@ export function searchCocktails(input: SearchInput): Cocktail[] {
   })
   const exact = filter(true, true, true)
   const relaxedQuery = filter(false, true, true)
+  const relaxedMood = filter(false, true, false)
   const relaxedStrength = filter(false, false, true)
   const hasConstraint = Boolean(valid.mood || valid.strength || valid.availableAlcohols?.length)
-  return exact.length ? exact : relaxedQuery.length && hasConstraint ? relaxedQuery : relaxedStrength.length && hasConstraint ? relaxedStrength : !query && !hasConstraint ? filter(false, false, false) : []
+  return exact.length ? exact : relaxedQuery.length && hasConstraint ? relaxedQuery : relaxedMood.length && hasConstraint ? relaxedMood : relaxedStrength.length && hasConstraint ? relaxedStrength : !query && !hasConstraint ? filter(false, false, false) : []
 }
 
 function cocktailPayload(cocktailsToReturn: Cocktail[]) { return cocktailsToReturn.map(({ id, name, mood, alcohol, level, description, ingredients, steps, time }) => ({ id, name, mood, alcohol, level, description, ingredients, steps, time })) }
 function json(status: number, payload: unknown) { return Response.json(payload, { status, headers: { 'Cache-Control': 'no-store' } }) }
-function fallbackResponse(input: AgentRequest, reason: string) { const queryResults = searchCocktails({ mood: input.mood, availableAlcohols: input.availableAlcohols, strength: input.strength, query: input.message }); const results = (queryResults.length ? queryResults : searchCocktails({ mood: input.mood, availableAlcohols: input.availableAlcohols, strength: input.strength })).slice(0, 3); return { ok: true, fallback: true, usedTool: false, answer: results.length ? `${results[0].name}을 기본 추천으로 안내해드릴게요.` : '조건에 맞는 칵테일을 찾지 못했어요. 술 종류나 도수를 조금 넓혀보세요.', cocktails: cocktailPayload(results), reason } }
+function fallbackResponse(input: AgentRequest, reason: string) { const queryResults = searchCocktails({ mood: input.mood, availableAlcohols: input.availableAlcohols, strength: input.strength, query: input.message }); const results = (queryResults.length ? queryResults : searchCocktails({ mood: input.mood, availableAlcohols: input.availableAlcohols, strength: input.strength })).slice(0, 3); return { ok: true, fallback: true, usedTool: false, answer: results.length ? `${results[0].name}을 기본 추천으로 안내해드릴게요.` : '조건에 맞는 칵테일을 찾지 못했어요. 술 종류나 도수를 조금 넓혀보세요.', cocktails: cocktailPayload(results), selection: { mood: input.mood, moodTheme: input.moodTheme, availableAlcohols: input.availableAlcohols, strength: input.strength }, reason } }
 
 export default { async fetch(request: Request) {
   if (request.method !== 'POST') return json(405, { ok: false, error: 'METHOD_NOT_ALLOWED', message: 'POST 요청만 사용할 수 있습니다.' })
@@ -87,7 +91,7 @@ export default { async fetch(request: Request) {
   if (!process.env.OPENAI_API_KEY) return json(503, { ok: false, error: 'OPENAI_API_KEY_MISSING', message: '서버 환경 변수에 OPENAI_API_KEY를 설정해주세요.' })
 
   const messages: Array<Record<string, unknown>> = [
-    { role: 'system', content: 'You are AI Bartender. Always call search_cocktails before recommending. Never invent a cocktail. The final recommendation must use only cocktail ids returned by the tool.' },
+    { role: 'system', content: 'You are AI Bartender. Always call search_cocktails before recommending. Infer the best moodTheme and strength from the user prompt. Use moodTheme for the ten mood cards, mood for the legacy cocktail catalog, and availableAlcohols when the user mentions a spirit. Never invent a cocktail. The final recommendation must use only cocktail ids returned by the tool.' },
     { role: 'user', content: input.message },
   ]
   try {
@@ -99,7 +103,7 @@ export default { async fetch(request: Request) {
     const toolInput = validateSearchInput(JSON.parse(toolCall.function.arguments) as SearchInput)
     const results = searchCocktails(toolInput)
     const safeResults = cocktailPayload(results)
-    return json(200, { ok: true, fallback: false, usedTool: true, answer: safeResults.length ? `${safeResults[0].name}을 추천합니다.` : '조건에 맞는 칵테일을 찾지 못했어요. 술 종류나 도수를 조금 넓혀보세요.', cocktails: safeResults })
+    return json(200, { ok: true, fallback: false, usedTool: true, answer: safeResults.length ? `${safeResults[0].name}을 추천합니다.` : '조건에 맞는 칵테일을 찾지 못했어요. 술 종류나 도수를 조금 넓혀보세요.', cocktails: safeResults, selection: { mood: toolInput.mood, moodTheme: toolInput.moodTheme, availableAlcohols: toolInput.availableAlcohols, strength: toolInput.strength } })
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'unknown error'
     return json(200, fallbackResponse(input, `OpenAI 호출 실패: ${reason}`))
