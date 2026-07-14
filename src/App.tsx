@@ -61,6 +61,18 @@ function matchNaturalLanguageMood(input: string) {
   const selectedTheme = best.score ? best.theme : moodThemes[0]
   const selectedAlcohol = (Object.entries(alcoholKeywords).find(([, keywords]) => keywords.some(keyword => text.includes(keyword.toLowerCase().replace(/\s+/g, ''))))?.[0] || undefined) as Alcohol | undefined
   const selectedStrength = (Object.entries(strengthKeywords).find(([, keywords]) => keywords.some(keyword => text.includes(keyword.toLowerCase().replace(/\s+/g, ''))))?.[0] || undefined) as Strength | undefined
+  if (typeof document !== 'undefined') window.setTimeout(() => {
+    const moodButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.mood-theme-card')).find(button => button.textContent?.includes(selectedTheme.name))
+    moodButton?.click()
+    if (selectedStrength) {
+      const strengthButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.strength-options button')).find(button => button.textContent?.includes(strengthLabels[selectedStrength]))
+      strengthButton?.click()
+    }
+    if (selectedAlcohol) {
+      const alcoholButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.ingredient-chip')).find(button => button.textContent?.includes(alcoholLabels[selectedAlcohol]))
+      alcoholButton?.click()
+    }
+  }, 0)
   return { theme: selectedTheme, alcohol: selectedAlcohol, strength: selectedStrength }
 }
 const youtubeByTheme: Record<MoodTheme, { videoId: string; startSeconds: number }> = { 'golden-hour': { videoId:'Dx5qFachd3A', startSeconds:42 }, flirt:{ videoId:'lCOF9LN_Zxs', startSeconds:35 }, 'soft-mood':{ videoId:'jfKfPfyJRdk', startSeconds:58 }, 'after-dark':{ videoId:'Dx5qFachd3A', startSeconds:86 }, bold:{ videoId:'kJQP7kiw5Fk', startSeconds:48 }, escape:{ videoId:'ZbZSe6N_BXs', startSeconds:28 }, celebration:{ videoId:'ZbZSe6N_BXs', startSeconds:52 }, 'rainy-day':{ videoId:'q76bMs-NwRk', startSeconds:64 }, 'sweet-crush':{ videoId:'E1bFoaG7p6I', startSeconds:24 }, chill:{ videoId:'jfKfPfyJRdk', startSeconds:72 } }
