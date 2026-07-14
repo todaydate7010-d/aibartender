@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { alcohols, cocktails } from "./data/cocktails";
 import type { Alcohol, Cocktail, Mood, MoodTheme, Strength } from "./types";
+import { loadCloudState, saveCloudState, type CloudState } from "./lib/cloudState";
 
 type Screen =
   | "welcome"
@@ -682,14 +683,6 @@ const localizeCocktail = (cocktail: Cocktail) => ({
   ingredients: cocktail.ingredients.map(localizeIngredient),
   steps: cocktail.steps.map(localizeStep),
 });
-const readStorage = <T,>(key: string, fallback: T): T => {
-  try {
-    const value = localStorage.getItem(key);
-    return value === null ? fallback : (JSON.parse(value) as T);
-  } catch {
-    return fallback;
-  }
-};
 type AgentApiResponse = {
   ok: boolean;
   fallback?: boolean;
@@ -1843,51 +1836,48 @@ function About({ onBack }: { onBack: () => void }) {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("welcome");
-  const [themeId, setThemeId] = useState<MoodTheme>(() =>
-    readStorage<MoodTheme>("ai-bartender-theme", "golden-hour"),
-  );
-  const [mood, setMood] = useState<Mood>(() =>
-    readStorage<Mood>("ai-bartender-mood", "Happy"),
-  );
-  const [available, setAvailable] = useState<Alcohol[]>(() =>
-    readStorage<Alcohol[]>("ai-bartender-available", []),
-  );
-  const [strength, setStrength] = useState<Strength>(() =>
-    readStorage<Strength>("ai-bartender-strength", "Medium"),
-  );
-  const [result, setResult] = useState<Cocktail>(() => {
-    const stored = readStorage<{ id: number } | null>(
-      "ai-bartender-result",
-      null,
-    );
-    return cocktails.find((c) => c.id === stored?.id) || cocktails[1];
-  });
-  const [favorites, setFavorites] = useState<Cocktail[]>(() =>
-    readStorage<Cocktail[]>("ai-bartender-favorites", []),
-  );
-  const [dark, setDark] = useState(() =>
-    readStorage<boolean>("ai-bartender-dark", true),
-  );
-  const [animations, setAnimations] = useState(() =>
-    readStorage<boolean>("ai-bartender-animations", true),
-  );
+  const [themeId, setThemeId] = useState<MoodTheme>("golden-hour");
+  const [mood, setMood] = useState<Mood>("Happy");
+  const [available, setAvailable] = useState<Alcohol[]>([]);
+  const [strength, setStrength] = useState<Strength>("Medium");
+  const [result, setResult] = useState<Cocktail>(cocktails[1]);
+  const [favorites, setFavorites] = useState<Cocktail[]>([]);
+  const [dark, setDark] = useState(true);
+  const [animations, setAnimations] = useState(true);
+  const [cloudReady, setCloudReady] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+
   useEffect(() => {
-    localStorage.setItem("ai-bartender-favorites", JSON.stringify(favorites));
-  }, [favorites]);
+    let active = true;
+    loadCloudState()
+      .then((state) => {
+        if (!active) return;
+        if (state) {
+          setThemeId(state.themeId);
+          setMood(state.mood);
+          setAvailable(state.available);
+          setStrength(state.strength);
+          setResult(cocktails.find((cocktail) => cocktail.id === state.resultId) || cocktails[1]);
+          setFavorites(state.favorites);
+          setDark(state.dark);
+          setAnimations(state.animations);
+        }
+        setCloudReady(true);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setCloudError(error instanceof Error ? error.message : "Supabase 연결에 실패했어요.");
+        setCloudReady(true);
+      });
+    return () => { active = false };
+  }, []);
+
   useEffect(() => {
-    localStorage.setItem("ai-bartender-theme", JSON.stringify(themeId));
-    localStorage.setItem("ai-bartender-mood", JSON.stringify(mood));
-    localStorage.setItem("ai-bartender-available", JSON.stringify(available));
-    localStorage.setItem("ai-bartender-strength", JSON.stringify(strength));
-    localStorage.setItem(
-      "ai-bartender-result",
-      JSON.stringify({ id: result.id }),
-    );
-  }, [themeId, mood, available, strength, result]);
-  useEffect(() => {
-    localStorage.setItem("ai-bartender-dark", JSON.stringify(dark));
-    localStorage.setItem("ai-bartender-animations", JSON.stringify(animations));
-  }, [dark, animations]);
+    if (!cloudReady || cloudError) return;
+    const state: CloudState = { themeId, mood, available, strength, resultId: result.id, favorites, dark, animations };
+    const timer = window.setTimeout(() => { void saveCloudState(state).catch((error) => setCloudError(error instanceof Error ? error.message : "저장에 실패했어요.")) }, 250);
+    return () => window.clearTimeout(timer);
+  }, [cloudReady, cloudError, themeId, mood, available, strength, result, favorites, dark, animations]);
   const recommend = (
     nextTheme = themeId,
     nextAvailable = available,
