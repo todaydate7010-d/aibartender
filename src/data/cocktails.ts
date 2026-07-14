@@ -23,7 +23,6 @@ const base = [
   ['Pear Blossom','Relaxed','Soju','Light','Delicate pear and floral notes for a soft landing.','2 oz soju|1 oz pear nectar|0.5 oz lemon juice|Elderflower syrup','Shake with ice.|Strain into a stemmed glass.|Garnish with a pear slice.','5 min','Lo-fi Evening','🍐','linear-gradient(145deg,#c7d38a,#596b5e)'],
 ] as const
 
-export const cocktails: Cocktail[] = base.map((item, index) => ({ id:index + 1, name:item[0], mood:item[1] as Cocktail['mood'], alcohol:item[2] as Cocktail['alcohol'], level:item[3] as Cocktail['level'], description:item[4], ingredients:item[5].split('|'), steps:item[6].split('|'), time:item[7], playlist:item[8], emoji:item[9], colors:item[10] }))
+export const cocktails: Cocktail[] = base.map((item, index) => ({ id:index + 1, name:item[0], mood:item[1] as Cocktail['mood'], alcohol:item[2] as Cocktail['alcohol'], level:item[3] as Cocktail['level'], description:item[4], ingredients:item[5].split('|'), steps:item[6].split('|'), time:item[7], playlist:item[8], colors:item[10] }))
 
-export const moods = [{ name:'Happy', emoji:'✦' },{ name:'Relaxed', emoji:'◌' },{ name:'Romantic', emoji:'♡' },{ name:'Party', emoji:'✺' },{ name:'Stressed', emoji:'⌁' },{ name:'Tired', emoji:'☾' }] as const
 export const alcohols = ['Vodka','Gin','Rum','Whiskey','Tequila','Brandy','Soju','Beer','Wine'] as const
