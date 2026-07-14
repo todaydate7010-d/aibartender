@@ -202,3 +202,28 @@ body{font-size:16px}.lead,.section-intro p,.page-heading p,.result-copy>p,.about
 .result-screen .art-large .cocktail-photo { transform:scale(1.16); }
 .result-screen .art-large .art-photo-shade { background:linear-gradient(145deg,rgba(0,0,0,.04),rgba(0,0,0,.42)); }
 @media(max-width:700px){.result-screen .result-copy{padding:24px 21px}.result-screen .art-large .cocktail-photo{transform:scale(1.2)}}
+.mood-ritual { margin:6px 0 22px; color:var(--mood-muted)!important; font:14px/1.6 'Hahmlet','Noto Sans KR',serif; letter-spacing:-.02em; }
+.result-screen .result-hero .art-large { transition:filter .5s, transform .5s; }
+.result-theme-golden-hour:after { background:radial-gradient(ellipse at 50% 8%,rgba(255,193,92,.3),transparent 38%)!important; animation:goldenGlow 7s ease-in-out infinite alternate; }
+.result-theme-flirt:after { background:radial-gradient(circle at 72% 20%,rgba(255,153,163,.22),transparent 24%),radial-gradient(circle at 22% 72%,rgba(155,45,83,.22),transparent 30%)!important; animation:softPulse 5s ease-in-out infinite alternate; }
+.result-theme-soft-mood:after { background:radial-gradient(ellipse at 50% 5%,rgba(246,226,180,.2),transparent 36%)!important; animation:slowBreath 10s ease-in-out infinite alternate; }
+.result-theme-after-dark:after { background:radial-gradient(ellipse at 78% 12%,rgba(222,171,79,.2),transparent 18%),linear-gradient(90deg,transparent 0 74%,rgba(202,150,64,.08) 78%,transparent 82%)!important; animation:loungeLight 8s ease-in-out infinite alternate; }
+.result-theme-bold:after { background:linear-gradient(115deg,transparent 36%,rgba(239,158,67,.18) 48%,transparent 58%)!important; animation:boldSweep 3.2s ease-in-out infinite alternate; }
+.result-theme-escape:after { background:radial-gradient(ellipse at 48% 86%,rgba(100,231,199,.22),transparent 32%),linear-gradient(160deg,rgba(27,173,192,.1),transparent 52%)!important; animation:waterDrift 8s ease-in-out infinite alternate; }
+.result-theme-celebration:after { background:radial-gradient(circle at 30% 18%,rgba(255,226,126,.25),transparent 12%),radial-gradient(circle at 80% 35%,rgba(255,226,126,.18),transparent 10%)!important; animation:sparkleFloat 4s ease-in-out infinite alternate; }
+.result-theme-rainy-day:after { background:repeating-linear-gradient(110deg,transparent 0 22px,rgba(220,226,235,.05) 23px,transparent 24px 48px),radial-gradient(ellipse at 70% 20%,rgba(191,205,218,.12),transparent 28%)!important; animation:rainDrift 6s linear infinite; }
+.result-theme-sweet-crush:after { background:radial-gradient(circle at 75% 18%,rgba(255,180,173,.24),transparent 20%),radial-gradient(circle at 20% 70%,rgba(255,213,184,.14),transparent 25%)!important; animation:softPulse 5.5s ease-in-out infinite alternate; }
+.result-theme-chill:after { background:radial-gradient(ellipse at 55% 88%,rgba(203,205,128,.15),transparent 30%)!important; animation:slowBreath 12s ease-in-out infinite alternate; }
+.result-theme-golden-hour .cocktail-photo { filter:saturate(.95) sepia(.12) contrast(1.12); }
+.result-theme-flirt .cocktail-photo, .result-theme-sweet-crush .cocktail-photo { filter:saturate(.9) contrast(1.08); }
+.result-theme-after-dark .cocktail-photo, .result-theme-bold .cocktail-photo { filter:saturate(.75) contrast(1.2) brightness(.82); }
+.result-theme-escape .cocktail-photo { filter:saturate(.8) hue-rotate(16deg) contrast(1.08); }
+@keyframes goldenGlow{from{opacity:.65;transform:scale(1)}to{opacity:1;transform:scale(1.08)}}
+@keyframes softPulse{from{opacity:.55;transform:scale(1)}to{opacity:1;transform:scale(1.06)}}
+@keyframes slowBreath{from{opacity:.4;transform:scale(1)}to{opacity:.78;transform:scale(1.04)}}
+@keyframes loungeLight{from{opacity:.45;transform:translateX(-2%)}to{opacity:.9;transform:translateX(2%)}}
+@keyframes boldSweep{from{opacity:.25;transform:translateX(-5%)}to{opacity:.9;transform:translateX(5%)}}
+@keyframes waterDrift{from{opacity:.45;transform:translateY(1%)}to{opacity:.85;transform:translateY(-2%)}}
+@keyframes sparkleFloat{from{opacity:.4;transform:translateY(2%)}to{opacity:1;transform:translateY(-2%)}}
+@keyframes rainDrift{from{background-position:0 0}to{background-position:30px 120px}}
+@media(prefers-reduced-motion:reduce){.result-screen:after{animation:none!important}}
